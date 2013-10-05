@@ -1,0 +1,20 @@
+{
+	"name": "dialup",
+	"version": "0.0.1",
+	"keywords": [
+		"webrtc"
+	],
+	"dependencies": {
+		"ws": "~0.4",
+		"streamlet": "*"
+	},
+	"scripts": {
+		"start": "./bin/dialup",
+		"prepublish": "make -B"
+	},
+	"devDependencies": {
+		"uglify-js": "*",
+		"davy": "*",
+		"subsequent": "*"
+	}
+}

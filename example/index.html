@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Dialup</title>
+	<meta name="description" content="">
+	<meta name="viewport" content="width=device-width">
+  <script src="../dialup.js"></script>
+</head>
+<body>
+<style>
+	video {
+		width: 250px;
+	}
+</style>
+<div id="local"></div>
+<div id="remote"></div>
+<input id="chat" type="text"></input>
+<script>
+	var dialup = new Dialup('ws://localhost:3001', 'room')
+	dialup.createStream(false, true).then(function (stream) {
+		var video = document.createElement('video')
+		video.autoplay = true
+		video.src = URL.createObjectURL(stream)
+
+		document.querySelector('#local').appendChild(video)
+	});
+
+	dialup.onAdd.listen(function (message) {
+		var video = document.createElement('video')
+		video.id = 'remote' + message.id
+		video.autoplay = true
+		video.src = URL.createObjectURL(message.stream)
+
+		document.querySelector('#remote').appendChild(video)
+
+		document.querySelector('#chat').on('change')
+			.filter(function (e) { return e.target.value !== '' })
+			.listen(function (e) {
+				e.target.value && speaker.send(e.target.value)
+				e.target.value = ''
+			})
+	})
+
+	dialup.onData.listen(function (message) {
+		console.log(message.data)
+	})
+
+	dialup.onLeave.listen(function (message) {
+		var video = document.querySelector('#remote' + message.id)
+		if (video) {
+			video.parentNode.removeChild(video);
+		}
+	})
+</script>
+</body>
+</html>

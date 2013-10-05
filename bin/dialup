@@ -1,0 +1,7 @@
+#! /usr/bin/env node
+// -*- js -*-
+'use strict'
+
+var Dialup = require('../')
+
+new Dialup().listen(3001)
