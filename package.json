@@ -10,7 +10,6 @@
 		"ws": "~0.4",
 		"streamlet": "*"
 	},
-	"main": "src/server",
 	"scripts": {
 		"prepublish": "make -B"
 	},
