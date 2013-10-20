@@ -1,21 +1,15 @@
 JS_COMPILER ?= ./node_modules/uglify-js/bin/uglifyjs
 FILES = \
 	src/util.js \
-	src/client.js \
 	src/dialup.js \
-	
-LIBS = \
-	node_modules/subsequent/subsequent.js \
-	node_modules/davy/davy.js \
-	node_modules/streamlet/streamlet.js \
+	src/client.js \
 
 all: \
 	dialup.js \
 	dialup.min.js
 
-dialup.js: ${FILES} ${LIBS}
+dialup.js: ${FILES}
 	@rm -f $@
-	@cat $(filter %.js,${LIBS}}) > $@.tmp
 	@echo "(function(global){" >> $@.tmp
 	@echo "'use strict'" >> $@.tmp
 	@cat $(filter %.js,${FILES}}) >> $@.tmp
