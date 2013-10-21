@@ -3,10 +3,11 @@
 var WebSocket = require('ws').Server,
     Stream = require('streamlet')
 
-var Dialup = module.exports = function () {
+var Dialup = module.exports = function (options) {
 	var sockets = {},
 	    rooms = {},
-	    stream = new Stream
+	    stream = new Stream,
+	    ws = new WebSocket(options)
 
 	this.onJoin = stream.filter(function (message) {
 		return message.type === 'join'
@@ -81,36 +82,34 @@ var Dialup = module.exports = function () {
 		}))
 	})
 
-	this.listen = function (port) {
-		new WebSocket({ port: port }).on('connection', function (socket) {
-			socket.hashCode = Math.floor((Math.random()*10000000))
+	ws.on('connection', function (socket) {
+		socket.hashCode = Math.random().toString(36).slice(2)
 
-			sockets[socket.hashCode] = socket;
+		sockets[socket.hashCode] = socket;
 
-			socket.on('message', function (message) {
-				var message = JSON.parse(message)
-				message._socket = socket
-				stream.add(message)
-			})
-
-			socket.on('close', function () {
-				var id = socket.hashCode
-				delete sockets[id]
-
-				for (var room in rooms) {
-					var clients = rooms[room]
-					if (clients.indexOf(id) !== -1) {
-						delete clients[clients.indexOf(id)]
-
-						clients.forEach(function (client) {
-							sockets[client].send(JSON.stringify({
-								type: 'leave',
-								id: id
-							}))
-						})
-					}
-				}
-			})
+		socket.on('message', function (message) {
+			var message = JSON.parse(message)
+			message._socket = socket
+			stream.add(message)
 		})
-	}
+
+		socket.on('close', function () {
+			var id = socket.hashCode
+			delete sockets[id]
+
+			for (var room in rooms) {
+				var clients = rooms[room]
+				if (clients.indexOf(id) !== -1) {
+					delete clients[clients.indexOf(id)]
+
+					clients.forEach(function (client) {
+						sockets[client].send(JSON.stringify({
+							type: 'leave',
+							id: id
+						}))
+					})
+				}
+			}
+		})
+	})
 }

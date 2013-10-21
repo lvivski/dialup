@@ -1,6 +1,6 @@
 {
 	"name": "dialup",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"author": "Yehor Lvivski <lvivski@gmail.com>",
 	"description": "WebRTC client/server library",
 	"keywords": [
@@ -14,9 +14,7 @@
 		"prepublish": "make -B"
 	},
 	"devDependencies": {
-		"uglify-js": "*",
-		"davy": "*",
-		"subsequent": "*"
+		"uglify-js": "*"
 	},
 	"license": "MIT"
 }
