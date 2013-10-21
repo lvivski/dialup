@@ -115,7 +115,7 @@
       var id = message.id;
       delete connections[id];
       delete data[id];
-      delete sockets[id];
+      sockets.splice(sockets.indexOf(id), 1);
     });
     this.onOffer.listen(function(message) {
       var pc = connections[message.id];

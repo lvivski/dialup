@@ -100,7 +100,7 @@ var Dialup = module.exports = function (options) {
 			for (var room in rooms) {
 				var clients = rooms[room]
 				if (clients.indexOf(id) !== -1) {
-					delete clients[clients.indexOf(id)]
+					clients.splice(clients.indexOf(id), 1)
 
 					clients.forEach(function (client) {
 						sockets[client].send(JSON.stringify({
