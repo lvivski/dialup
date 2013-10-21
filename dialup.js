@@ -90,7 +90,7 @@
       return promise;
     };
     this.onPeers.listen(function(message) {
-      me = parseInt(message.you, 10);
+      me = message.you;
       for (var i in message.connections) {
         var connection = message.connections[i];
         sockets.push(connection);
@@ -130,7 +130,7 @@
       pc.createOffer(function(session) {
         pc.setLocalDescription(session);
         send("offer", {
-          id: parseInt(socket),
+          id: socket,
           description: {
             sdp: session.sdp,
             type: session.type

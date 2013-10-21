@@ -95,7 +95,7 @@ function Dialup(url, room) {
 	}
 
 	this.onPeers.listen(function (message) {
-		me = parseInt(message.you, 10)
+		me = message.you
 
 		for (var i in message.connections) {
 			var connection = message.connections[i]
@@ -145,7 +145,7 @@ function Dialup(url, room) {
 		pc.createOffer(function (session) {
 			pc.setLocalDescription(session)
 			send('offer', {
-				id: parseInt(socket),
+				id: socket,
 				description: {
 					sdp: session.sdp,
 					type: session.type
