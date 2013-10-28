@@ -20,6 +20,23 @@
   }
   function Dialup(url, room) {
     var me = null, sockets = [], connections = {}, data = {}, streams = [], stream = new Stream(), socket = new WebSocket(url);
+    var constraints = {
+      optional: [],
+      mandatory: {
+        OfferToReceiveAudio: true,
+        OfferToReceiveVideo: true
+      }
+    }, servers = {
+      iceServers: [ {
+        url: "stun:stun.l.google.com:19302"
+      } ]
+    }, config = {
+      optional: [ {
+        RtpDataChannels: true
+      }, {
+        DtlsSrtpKeyAgreement: true
+      } ]
+    };
     socket.onopen = function() {
       send("join", {
         room: room || ""
@@ -86,7 +103,7 @@
           createOffer(socket, connection);
         }
         promise.fulfill(stream);
-      }, function() {});
+      }, function() {}, constraints);
       return promise;
     };
     this.onPeers.listen(function(message) {
@@ -136,7 +153,7 @@
             type: session.type
           }
         });
-      }, function() {});
+      }, function() {}, constraints);
     }
     function createAnswer(socket, pc) {
       pc.createAnswer(function(session) {
@@ -169,17 +186,7 @@
       data[id] = channel;
     }
     function createPeerConnection(id) {
-      var pc = new RTCPeerConnection({
-        iceServers: [ {
-          url: "stun:stun.l.google.com:19302"
-        } ]
-      }, {
-        optional: [ {
-          RtpDataChannels: true
-        }, {
-          DtlsSrtpKeyAgreement: true
-        } ]
-      });
+      var pc = new RTCPeerConnection(servers, config);
       pc.onicecandidate = function(e) {
         if (e.candidate != null) {
           send("candidate", {
