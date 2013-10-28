@@ -72,7 +72,8 @@ function Dialup(url, room) {
 	this.send = function (message) {
 		for (var k in data) {
 			var d = data[k]
-			d.send(message)
+			if (d.readyState === 'open')
+				d.send(message)
 		}
 	}
 
@@ -80,6 +81,25 @@ function Dialup(url, room) {
 		var promise = new Promise
 
 		getUserMedia({audio: audio, video: video}, function (stream) {
+			var audio = stream.getAudioTracks()[0],
+			    context = new AudioContext(),
+			    media = new MediaStream()
+
+			media.addTrack(audio)
+			stream.removeTrack(audio)
+			
+			var source = context.createMediaStreamSource(media),
+			    filter = context.createBiquadFilter(),
+			    destination = context.createMediaStreamDestination()
+
+			filter.type = filter.LOWPASS
+			filter.Q.value = 0
+			filter.frequency.value = 2000
+
+			source.connect(filter)
+			filter.connect(destination)
+			stream.addTrack(destination.stream.getAudioTracks()[0])
+
 			streams.push(stream)
 
 			for (var i = 0; i < sockets.length; ++i) {
