@@ -69,36 +69,42 @@ function Dialup(url, room) {
 		return message.type === 'data'
 	})
 
-	this.send = function (message) {
+	this.broadcast = function (message) {
 		for (var k in data) {
-			var d = data[k]
-			if (d.readyState === 'open')
-				d.send(message)
+			this.send(k, message)
 		}
+	}
+	
+	this.send = function (id, message) {
+		var d = data[id]
+		if (d.readyState === 'open')
+			d.send(message)
 	}
 
 	this.createStream = function (audio, video) {
 		var promise = new Promise
 
 		getUserMedia({audio: audio, video: video}, function (stream) {
-			var audio = stream.getAudioTracks()[0],
-			    context = new AudioContext(),
-			    media = new MediaStream()
+			if (AudioContext) {
+				var audio = stream.getAudioTracks()[0],
+				    context = new AudioContext(),
+				    media = new MediaStream()
 
-			media.addTrack(audio)
-			stream.removeTrack(audio)
-			
-			var source = context.createMediaStreamSource(media),
-			    filter = context.createBiquadFilter(),
-			    destination = context.createMediaStreamDestination()
+				media.addTrack(audio)
+				stream.removeTrack(audio)
 
-			filter.type = filter.LOWPASS
-			filter.Q.value = 0
-			filter.frequency.value = 2000
+				var source = context.createMediaStreamSource(media),
+				    filter = context.createBiquadFilter(),
+				    destination = context.createMediaStreamDestination()
 
-			source.connect(filter)
-			filter.connect(destination)
-			stream.addTrack(destination.stream.getAudioTracks()[0])
+				filter.type = filter.LOWPASS
+				filter.Q.value = 0
+				filter.frequency.value = 2000
+
+				source.connect(filter)
+				filter.connect(destination)
+				stream.addTrack(destination.stream.getAudioTracks()[0])
+			}
 
 			streams.push(stream)
 

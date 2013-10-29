@@ -73,11 +73,14 @@
     this.onData = stream.filter(function(message) {
       return message.type === "data";
     });
-    this.send = function(message) {
+    this.broadcast = function(message) {
       for (var k in data) {
-        var d = data[k];
-        if (d.readyState === "open") d.send(message);
+        this.send(k, message);
       }
+    };
+    this.send = function(id, message) {
+      var d = data[id];
+      if (d.readyState === "open") d.send(message);
     };
     this.createStream = function(audio, video) {
       var promise = new Promise();
@@ -85,16 +88,18 @@
         audio: audio,
         video: video
       }, function(stream) {
-        var audio = stream.getAudioTracks()[0], context = new AudioContext(), media = new MediaStream();
-        media.addTrack(audio);
-        stream.removeTrack(audio);
-        var source = context.createMediaStreamSource(media), filter = context.createBiquadFilter(), destination = context.createMediaStreamDestination();
-        filter.type = filter.LOWPASS;
-        filter.Q.value = 0;
-        filter.frequency.value = 2e3;
-        source.connect(filter);
-        filter.connect(destination);
-        stream.addTrack(destination.stream.getAudioTracks()[0]);
+        if (AudioContext) {
+          var audio = stream.getAudioTracks()[0], context = new AudioContext(), media = new MediaStream();
+          media.addTrack(audio);
+          stream.removeTrack(audio);
+          var source = context.createMediaStreamSource(media), filter = context.createBiquadFilter(), destination = context.createMediaStreamDestination();
+          filter.type = filter.LOWPASS;
+          filter.Q.value = 0;
+          filter.frequency.value = 2e3;
+          source.connect(filter);
+          filter.connect(destination);
+          stream.addTrack(destination.stream.getAudioTracks()[0]);
+        }
         streams.push(stream);
         for (var i = 0; i < sockets.length; ++i) {
           var socket = sockets[i];
