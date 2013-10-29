@@ -1,6 +1,6 @@
 var navigator = global.navigator,
 	RTCPeerConnection = global.PeerConnection || global.webkitPeerConnection00 || global.webkitRTCPeerConnection || global.mozRTCPeerConnection,
-	getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || noop).bind(navigator),
+	getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia).bind(navigator),
 	RTCIceCandidate = global.mozRTCIceCandidate || global.RTCIceCandidate,
 	RTCSessionDescription = global.mozRTCSessionDescription || global.RTCSessionDescription,
 	AudioContext = global.AudioContext || global.webkitAudioContext || global.mozAudioContext,
