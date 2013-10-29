@@ -240,6 +240,18 @@ function Dialup(url, room) {
 			}
 		}
 
+		pc.oniceconnectionstatechange = function() {
+			switch (pc.iceConnectionState) {
+				case 'disconnected':
+				case 'failed':
+					pc.close()
+					break
+				case 'completed':
+					pc.onicecandidate = function () {}
+					break
+			}
+		}
+
 		pc.onaddstream = function (e) {
 			stream.add({
 				type: 'add',
