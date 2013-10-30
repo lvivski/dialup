@@ -1,8 +1,15 @@
 {
 	"name": "dialup",
-	"version": "0.0.9",
+	"version": "0.0.10",
 	"main": [
 		"dialup.js"
+	],
+	"ignore": [
+		".*",
+		"src",
+		"Makefile",
+		"index.js",
+		"package.json"
 	],
 	"dependencies": {
 		"streamlet": "*",
