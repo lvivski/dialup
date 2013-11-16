@@ -14,6 +14,13 @@ function Dialup(url, room) {
 	    		OfferToReceiveVideo:true
 	    	}
 	    },
+	    constraintsScreen = {
+	    	video: {
+	    		mandatory: {
+	    			chromeMediaSource: 'screen'
+	    		}
+	    	}
+	    },
 	    servers = {
 	    	iceServers: [{ url: 'stun:stun.l.google.com:19302' }]
 	    },
@@ -85,15 +92,9 @@ function Dialup(url, room) {
 		var promise = new Promise
 
 		getUserMedia({audio: audio, video: video}, function (stream) {
-			if (AudioContext) {
-				var audio = stream.getAudioTracks()[0],
-				    context = new AudioContext(),
-				    media = new MediaStream()
-
-				media.addTrack(audio)
-				stream.removeTrack(audio)
-
-				var source = context.createMediaStreamSource(media),
+			if (AudioContext && MediaStream && MediaStream.prototype.removeTrack) {
+				var context = new AudioContext(),
+				    source = context.createMediaStreamSource(stream),
 				    filter = context.createBiquadFilter(),
 				    destination = context.createMediaStreamDestination()
 
@@ -103,6 +104,7 @@ function Dialup(url, room) {
 
 				source.connect(filter)
 				filter.connect(destination)
+				stream.removeTrack(stream.getAudioTracks()[0])
 				stream.addTrack(destination.stream.getAudioTracks()[0])
 			}
 
