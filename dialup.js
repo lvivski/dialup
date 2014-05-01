@@ -1,6 +1,6 @@
 (function(global) {
   "use strict";
-  var navigator = global.navigator, RTCPeerConnection = global.PeerConnection || global.webkitPeerConnection00 || global.webkitRTCPeerConnection || global.mozRTCPeerConnection, getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia).bind(navigator), RTCIceCandidate = global.mozRTCIceCandidate || global.RTCIceCandidate, RTCSessionDescription = global.mozRTCSessionDescription || global.RTCSessionDescription, AudioContext = global.AudioContext || global.webkitAudioContext || global.mozAudioContext, MediaStream = global.MediaStream || global.webkitMediaStream || global.mozMediaStream;
+  var navigator = global.navigator, RTCPeerConnection = global.mozRTCPeerConnection || global.webkitRTCPeerConnection || global.PeerConnection, getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia).bind(navigator), RTCIceCandidate = global.mozRTCIceCandidate || global.RTCIceCandidate, RTCSessionDescription = global.mozRTCSessionDescription || global.RTCSessionDescription, AudioContext = global.webkitAudioContext || global.mozAudioContext || global.AudioContext, MediaStream = global.webkitMediaStream || global.mozMediaStream || global.MediaStream;
   global.URL = global.URL || global.webkitURL || global.msURL;
   var Stream, Promise;
   if (typeof define === "function" && define.amd) {
@@ -38,8 +38,6 @@
       } ]
     }, config = {
       optional: [ {
-        RtpDataChannels: true
-      }, {
         DtlsSrtpKeyAgreement: true
       } ]
     };
@@ -187,8 +185,9 @@
       }, function() {});
     }
     function createDataChannel(id, pc, label) {
-      var channel = pc.createDataChannel(label || "fileTransfer", {
-        reliable: false
+      label || (label = "dataChannel");
+      var channel = pc.createDataChannel(label, {
+        reliable: true
       });
       addDataChannel(id, channel);
     }

@@ -10,8 +10,8 @@ function Dialup(url, room) {
 	var constraints = {
 	    	optional: [],
 	    	mandatory: {
-	    		OfferToReceiveAudio:true,
-	    		OfferToReceiveVideo:true
+	    		OfferToReceiveAudio: true,
+	    		OfferToReceiveVideo: true
 	    	}
 	    },
 	    constraintsScreen = {
@@ -25,7 +25,7 @@ function Dialup(url, room) {
 	    	iceServers: [{ url: 'stun:stun.l.google.com:19302' }]
 	    },
 	    config = {
-	    	optional: [{ RtpDataChannels: true }, { DtlsSrtpKeyAgreement: true }]
+	    	optional: [{ DtlsSrtpKeyAgreement: true }]
 	    }
 
 	socket.onopen = function () {
@@ -81,7 +81,7 @@ function Dialup(url, room) {
 			this.send(k, message)
 		}
 	}
-	
+
 	this.send = function (id, message) {
 		var d = data[id]
 		if (d.readyState === 'open')
@@ -209,7 +209,10 @@ function Dialup(url, room) {
 	}
 
 	function createDataChannel(id, pc, label) {
-		var channel = pc.createDataChannel(label || 'fileTransfer', { reliable: false })
+		label || (label = 'dataChannel')
+
+		var channel = pc.createDataChannel(label, { reliable: true })
+
 		addDataChannel(id, channel)
 	}
 
