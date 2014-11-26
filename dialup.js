@@ -3,23 +3,26 @@
   if (typeof global !== "Window") {
     global = window;
   }
-  var navigator = global.navigator, RTCPeerConnection = global.mozRTCPeerConnection || global.webkitRTCPeerConnection || global.PeerConnection, getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia).bind(navigator), RTCIceCandidate = global.mozRTCIceCandidate || global.RTCIceCandidate, RTCSessionDescription = global.mozRTCSessionDescription || global.RTCSessionDescription, AudioContext = global.webkitAudioContext || global.mozAudioContext || global.AudioContext, MediaStream = global.webkitMediaStream || global.mozMediaStream || global.MediaStream;
+  var navigator = global.navigator, RTCPeerConnection = global.mozRTCPeerConnection || global.webkitRTCPeerConnection || global.PeerConnection, getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia).bind(navigator), RTCIceCandidate = global.mozRTCIceCandidate || global.RTCIceCandidate, RTCSessionDescription = global.mozRTCSessionDescription || global.RTCSessionDescription;
   global.URL = global.URL || global.webkitURL || global.msURL;
-  var Stream, Promise;
+  var Stream, Promise, Audio;
   if (typeof define === "function" && define.amd) {
-    define([ "streamlet", "davy" ], function(Streamlet, Davy) {
+    define([ "streamlet", "davy", "overtone" ], function(Streamlet, Davy, Overtone) {
       Stream = Streamlet;
       Promise = Davy;
+      Audio = Overtone;
       return Dialup;
     });
   } else if (typeof module === "object" && module.exports) {
     module.exports = Dialup;
     Stream = require("streamlet");
     Promise = require("davy");
+    Audio = require("overtone");
   } else {
     global.Dialup = Dialup;
-    Stream = global.Stream;
+    Stream = global.Streamlet;
     Promise = global.Davy;
+    Audio = global.Overtone;
   }
   function Dialup(url, room) {
     var me = null, sockets = [], connections = {}, data = {}, streams = [], stream = new Stream(), socket = new WebSocket(url);
@@ -95,16 +98,7 @@
         audio: audio,
         video: video
       }, function(stream) {
-        if (AudioContext && MediaStream && MediaStream.prototype.removeTrack) {
-          var context = new AudioContext(), source = context.createMediaStreamSource(stream), filter = context.createBiquadFilter(), destination = context.createMediaStreamDestination();
-          filter.type = filter.LOWPASS;
-          filter.Q.value = 0;
-          filter.frequency.value = 2e3;
-          source.connect(filter);
-          filter.connect(destination);
-          stream.removeTrack(stream.getAudioTracks()[0]);
-          stream.addTrack(destination.stream.getAudioTracks()[0]);
-        }
+        Audio.filter(stream);
         streams.push(stream);
         for (var i = 0; i < sockets.length; ++i) {
           var socket = sockets[i];

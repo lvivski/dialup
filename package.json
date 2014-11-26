@@ -1,20 +1,21 @@
 {
-	"name": "dialup",
-	"version": "0.1.0",
-	"author": "Yehor Lvivski <lvivski@gmail.com>",
-	"description": "WebRTC client/server library",
-	"keywords": [
-		"webrtc"
-	],
-	"dependencies": {
-		"ws": "~0.4",
-		"streamlet": "*"
-	},
-	"scripts": {
-		"prepublish": "make -B"
-	},
-	"devDependencies": {
-		"uglify-js": "*"
-	},
-	"license": "MIT"
+  "name": "dialup",
+  "version": "0.1.0",
+  "author": "Yehor Lvivski <lvivski@gmail.com>",
+  "description": "WebRTC client/server library",
+  "keywords": [
+    "webrtc"
+  ],
+  "dependencies": {
+    "ws": "~0.4",
+    "streamlet": "*",
+    "overtone": "*"
+  },
+  "scripts": {
+    "prepublish": "make -B"
+  },
+  "devDependencies": {
+    "uglify-js": "*"
+  },
+  "license": "MIT"
 }
