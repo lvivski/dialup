@@ -12,5 +12,5 @@ if (typeof define === 'function' && define.amd) {
 } else {
 	global.Dialup = Dialup
 	Stream = global.Stream
-	Promise = global.Promise
+	Promise = global.Davy
 }

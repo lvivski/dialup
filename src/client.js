@@ -89,7 +89,7 @@ function Dialup(url, room) {
 	}
 
 	this.createStream = function (audio, video) {
-		var promise = new Promise
+		var defer = Promise.defer()
 
 		getUserMedia({audio: audio, video: video}, function (stream) {
 			if (AudioContext && MediaStream && MediaStream.prototype.removeTrack) {
@@ -129,10 +129,10 @@ function Dialup(url, room) {
 				createOffer(socket, connection)
 			}
 
-			promise.fulfill(stream)
+			defer.fulfill(stream)
 		}, function () {}, constraints)
 
-		return promise
+		return defer.promise
 	}
 
 	this.onPeers.listen(function (message) {

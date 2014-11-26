@@ -1,5 +1,8 @@
 (function(global) {
   "use strict";
+  if (typeof global !== "Window") {
+    global = window;
+  }
   var navigator = global.navigator, RTCPeerConnection = global.mozRTCPeerConnection || global.webkitRTCPeerConnection || global.PeerConnection, getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia).bind(navigator), RTCIceCandidate = global.mozRTCIceCandidate || global.RTCIceCandidate, RTCSessionDescription = global.mozRTCSessionDescription || global.RTCSessionDescription, AudioContext = global.webkitAudioContext || global.mozAudioContext || global.AudioContext, MediaStream = global.webkitMediaStream || global.mozMediaStream || global.MediaStream;
   global.URL = global.URL || global.webkitURL || global.msURL;
   var Stream, Promise;
@@ -16,7 +19,7 @@
   } else {
     global.Dialup = Dialup;
     Stream = global.Stream;
-    Promise = global.Promise;
+    Promise = global.Davy;
   }
   function Dialup(url, room) {
     var me = null, sockets = [], connections = {}, data = {}, streams = [], stream = new Stream(), socket = new WebSocket(url);
@@ -87,7 +90,7 @@
       if (d.readyState === "open") d.send(message);
     };
     this.createStream = function(audio, video) {
-      var promise = new Promise();
+      var defer = Promise.defer();
       getUserMedia({
         audio: audio,
         video: video
@@ -119,9 +122,9 @@
           createDataChannel(socket, connection);
           createOffer(socket, connection);
         }
-        promise.fulfill(stream);
+        defer.fulfill(stream);
       }, function() {}, constraints);
-      return promise;
+      return defer.promise;
     };
     this.onPeers.listen(function(message) {
       me = message.you;
