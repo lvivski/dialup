@@ -1,12 +1,13 @@
 'use strict'
 
 var WebSocket = require('ws').Server,
-    Stream = require('streamlet')
+    Observable = require('streamlet')
 
 var Dialup = module.exports = function (options) {
 	var sockets = {},
 	    rooms = {},
-	    stream = new Stream,
+	    controller = Observable.control(),
+		stream = controller.stream,
 	    ws = new WebSocket(options)
 
 	this.onJoin = stream.filter(function (message) {
@@ -88,9 +89,9 @@ var Dialup = module.exports = function (options) {
 		sockets[socket.hashCode] = socket;
 
 		socket.on('message', function (message) {
-			var message = JSON.parse(message)
+			message = JSON.parse(message)
 			message._socket = socket
-			stream.add(message)
+			controller.add(message)
 		})
 
 		socket.on('close', function () {

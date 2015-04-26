@@ -1,1 +1,1 @@
-module.exports = require('./dialup.js');
+module.exports = require('./dialup');

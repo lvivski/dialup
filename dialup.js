@@ -5,27 +5,27 @@
   }
   var navigator = global.navigator, RTCPeerConnection = global.mozRTCPeerConnection || global.webkitRTCPeerConnection || global.PeerConnection, getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia).bind(navigator), RTCIceCandidate = global.mozRTCIceCandidate || global.RTCIceCandidate, RTCSessionDescription = global.mozRTCSessionDescription || global.RTCSessionDescription;
   global.URL = global.URL || global.webkitURL || global.msURL;
-  var Stream, Promise, Audio;
+  var Observable, Promise, Audio;
   if (typeof define === "function" && define.amd) {
-    define([ "streamlet", "davy", "overtone" ], function(Streamlet, Davy, Overtone) {
-      Stream = Streamlet;
-      Promise = Davy;
-      Audio = Overtone;
+    define([ "streamlet", "davy", "overtone" ], function(streamlet, davy, overtone) {
+      Observable = streamlet;
+      Promise = davy;
+      Audio = overtone;
       return Dialup;
     });
   } else if (typeof module === "object" && module.exports) {
     module.exports = Dialup;
-    Stream = require("streamlet");
+    Observable = require("streamlet");
     Promise = require("davy");
     Audio = require("overtone");
   } else {
     global.Dialup = Dialup;
-    Stream = global.Streamlet;
+    Observable = global.Streamlet;
     Promise = global.Davy;
     Audio = global.Overtone;
   }
   function Dialup(url, room) {
-    var me = null, sockets = [], connections = {}, data = {}, streams = [], stream = new Stream(), socket = new WebSocket(url);
+    var me = null, sockets = [], connections = {}, data = {}, streams = [], controller = Observable.control(), stream = controller.stream, socket = new WebSocket(url);
     var constraints = {
       optional: [],
       mandatory: {
@@ -54,7 +54,7 @@
     };
     socket.onerror = function() {};
     socket.onmessage = function(e) {
-      stream.add(JSON.parse(e.data));
+      controller.add(JSON.parse(e.data));
     };
     this.onOffer = stream.filter(function(message) {
       return message.type === "offer";
@@ -105,8 +105,8 @@
           connections[socket] = createPeerConnection(socket);
         }
         for (i = 0; i < streams.length; ++i) {
-          var stream = streams[i];
-          for (var socket in connections) {
+          stream = streams[i];
+          for (socket in connections) {
             var connection = connections[socket];
             connection.addStream(stream);
           }
@@ -191,7 +191,7 @@
     function addDataChannel(id, channel) {
       channel.onopen = function() {};
       channel.onmessage = function(e) {
-        stream.add({
+        controller.add({
           type: "data",
           id: id,
           data: e.data
@@ -224,14 +224,14 @@
         }
       };
       pc.onaddstream = function(e) {
-        stream.add({
+        controller.add({
           type: "add",
           id: id,
           stream: e.stream
         });
       };
       pc.onremovestream = function(e) {
-        stream.add({
+        controller.add({
           type: "remove",
           id: id,
           stream: e.stream

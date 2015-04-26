@@ -1,19 +1,19 @@
-var Stream, Promise, Audio
+var Observable, Promise, Audio
 if (typeof define === 'function' && define.amd) {
-	define(['streamlet', 'davy', 'overtone'], function (Streamlet, Davy, Overtone) {
-		Stream = Streamlet
-		Promise = Davy
-		Audio = Overtone
+	define(['streamlet', 'davy', 'overtone'], function (streamlet, davy, overtone) {
+		Observable = streamlet
+		Promise = davy
+		Audio = overtone
 		return Dialup
 	})
 } else if (typeof module === 'object' && module.exports) {
 	module.exports = Dialup
-	Stream = require('streamlet')
+	Observable = require('streamlet')
 	Promise = require('davy')
 	Audio = require('overtone')
 } else {
 	global.Dialup = Dialup
-	Stream = global.Streamlet
+	Observable = global.Streamlet
 	Promise = global.Davy
 	Audio = global.Overtone
 }

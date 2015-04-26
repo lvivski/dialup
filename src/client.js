@@ -4,7 +4,8 @@ function Dialup(url, room) {
 	    connections = {},
 	    data = {},
 	    streams = [],
-	    stream = new Stream,
+	    controller = Observable.control(),
+		stream = controller.stream,
 		socket = new WebSocket(url)
 
 	var constraints = {
@@ -37,7 +38,7 @@ function Dialup(url, room) {
 	socket.onerror = function () {}
 
 	socket.onmessage = function (e) {
-		stream.add(JSON.parse(e.data))
+		controller.add(JSON.parse(e.data))
 	}
 
 	this.onOffer = stream.filter(function (message) {
@@ -103,8 +104,8 @@ function Dialup(url, room) {
 			}
 
 			for (i = 0; i < streams.length; ++i) {
-				var stream = streams[i]
-				for (var socket in connections) {
+				stream = streams[i]
+				for (socket in connections) {
 					var connection = connections[socket]
 					connection.addStream(stream)
 				}
@@ -207,7 +208,7 @@ function Dialup(url, room) {
 		channel.onopen = function () {}
 
 		channel.onmessage = function (e) {
-			stream.add({
+			controller.add({
 				type: 'data',
 				id: id,
 				data: e.data
@@ -245,7 +246,7 @@ function Dialup(url, room) {
 		}
 
 		pc.onaddstream = function (e) {
-			stream.add({
+			controller.add({
 				type: 'add',
 				id: id,
 				stream: e.stream
@@ -253,7 +254,7 @@ function Dialup(url, room) {
 		}
 
 		pc.onremovestream = function (e) {
-			stream.add({
+			controller.add({
 				type: 'remove',
 				id: id,
 				stream: e.stream
