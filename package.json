@@ -7,7 +7,7 @@
     "webrtc"
   ],
   "dependencies": {
-    "ws": "~0.4",
+    "ws": "~7.3",
     "streamlet": "*",
     "overtone": "*"
   },
