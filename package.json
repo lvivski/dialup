@@ -7,7 +7,6 @@
     "webrtc"
   ],
   "dependencies": {
-    "davy": "*",
     "overtone": "*",
     "streamlet": "*",
     "ws": "*"

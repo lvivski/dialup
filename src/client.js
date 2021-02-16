@@ -5,39 +5,23 @@ function Dialup(url, room) {
 	    data = {},
 	    streams = [],
 	    controller = Observable.control(),
-		stream = controller.stream,
-		socket = new WebSocket(url)
+			stream = controller.stream,
+			ws = new WebSocket(url)
 
 	var constraints = {
-	    	optional: [],
-	    	mandatory: {
-	    		OfferToReceiveAudio: true,
-	    		OfferToReceiveVideo: true
-	    	}
-	    },
-	    constraintsScreen = {
-	    	video: {
-	    		mandatory: {
-	    			chromeMediaSource: 'screen'
-	    		}
-	    	}
-	    },
-	    servers = {
-	    	iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-	    },
-	    config = {
-	    	optional: [{ DtlsSrtpKeyAgreement: true }]
-	    }
+		offerToReceiveAudio: true,
+		offerToReceiveVideo: true
+	}
 
-	socket.onopen = function () {
+	ws.onopen = function () {
 		send('join', {
 			room: room || ''
 		})
 	}
 
-	socket.onerror = function () {}
+	ws.onerror = function () {}
 
-	socket.onmessage = function (e) {
+	ws.onmessage = function (e) {
 		controller.add(JSON.parse(e.data))
 	}
 
@@ -107,7 +91,6 @@ function Dialup(url, room) {
 				stream = streams[i]
 				for (socket in connections) {
 					var connection = connections[socket]
-					console.log(connection)
 					stream.getTracks().forEach(function (track) {
 						connection.addTrack(track, stream)
 					})
@@ -121,7 +104,7 @@ function Dialup(url, room) {
 			}
 
 			defer.fulfill(stream)
-		}, function () {}, constraints)
+		})
 
 		return defer.promise
 	}
@@ -141,9 +124,9 @@ function Dialup(url, room) {
 			candidate: message.candidate
 		})
 
-		console.log(message, candidate)
-
-		connections[message.id].addIceCandidate(candidate)
+		connections[message.id].addIceCandidate(candidate).catch(function (e) {
+			console.log(e)
+		})
 	})
 
 	this.onNew.listen(function (message) {
@@ -153,7 +136,9 @@ function Dialup(url, room) {
 		sockets.push(id)
 		connections[id] = pc
 		streams.forEach(function (stream) {
-			pc.addStream(stream)
+			stream.getTracks().forEach(function (track) {
+				pc.addTrack(track, stream)
+			})
 		})
 	})
 
@@ -176,36 +161,45 @@ function Dialup(url, room) {
 	})
 
 	function createOffer(socket, pc) {
-		pc.createOffer(function (session) {
-			pc.setLocalDescription(session)
-			send('offer', {
-				id: socket,
-				description: {
-					sdp: session.sdp,
-					type: session.type
-				}
-			})
-		}, function () {}, constraints)
+		pc.createOffer(constraints).then(
+			function (session) {
+				pc.setLocalDescription(session).then(
+					function() {
+						send('offer', {
+							id: socket,
+							description: {
+								sdp: session.sdp,
+								type: session.type
+							}
+						})
+					}
+				)
+
+			},
+			function () {}
+		)
 	}
 
 	function createAnswer(socket, pc) {
-		pc.createAnswer(function (session) {
-			pc.setLocalDescription(session)
-			send('answer', {
-				id: socket,
-				description: {
-					sdp: session.sdp,
-					type: session.type
-				}
-			})
-		}, function () {})
+		pc.createAnswer().then(
+			function (session) {
+				pc.setLocalDescription(session)
+				send('answer', {
+					id: socket,
+					description: {
+						sdp: session.sdp,
+						type: session.type
+					}
+				})
+			},
+			function () {}
+		)
 	}
 
 	function createDataChannel(id, pc, label) {
 		label || (label = 'dataChannel')
 
-		var channel = pc.createDataChannel(label, { reliable: true })
-
+		var channel = pc.createDataChannel(label)
 		addDataChannel(id, channel)
 	}
 
@@ -226,16 +220,15 @@ function Dialup(url, room) {
 	}
 
 	function createPeerConnection(id) {
-		var pc = new RTCPeerConnection(servers, config)
+		var pc = new RTCPeerConnection()
 
 		pc.onicecandidate = function (e) {
 			if (e.candidate != null) {
-				if (e.candidate.candidate)
-					send('candidate', {
-						label: e.candidate.sdpMLineIndex,
-						id: id,
-						candidate: e.candidate.candidate
-					})
+				send('candidate', {
+					label: e.candidate.sdpMLineIndex,
+					id: id,
+					candidate: e.candidate.candidate
+				})
 			}
 		}
 
@@ -267,13 +260,13 @@ function Dialup(url, room) {
 			})
 		}
 
-		pc.onremovestream = function (e) {
-			controller.add({
-				type: 'remove',
-				id: id,
-				stream: e.stream
-			})
-		}
+		// pc.onremovestream = function (e) {
+		// 	controller.add({
+		// 		type: 'remove',
+		// 		id: id,
+		// 		stream: e.stream
+		// 	})
+		// }
 
 		pc.ondatachannel = function (e) {
 			addDataChannel(id, e.channel)
@@ -284,6 +277,6 @@ function Dialup(url, room) {
 
 	function send(event, data) {
 		data.type = event
-		socket.send(JSON.stringify(data))
+		ws.send(JSON.stringify(data))
 	}
 }
