@@ -14,14 +14,14 @@ dialup.js: ${FILES}
 	@echo "'use strict'" >> $@.tmp
 	@cat $(filter %.js,${FILES}}) >> $@.tmp
 	@echo "}(this))" >> $@.tmp
-	@$(JS_COMPILER) $@.tmp -b indent-level=2 -o $@
+	@$(JS_COMPILER) $@.tmp -b indent_level=2 -o $@
 	@rm $@.tmp
 	@chmod a-w $@
 
 dialup.min.js: dialup.js
 	@rm -f $@
 	@$(JS_COMPILER) $< -c -m -o $@ \
-		--source-map $@.map \
+		--source-map \
 		&& du -h $< $@
 
 deps:

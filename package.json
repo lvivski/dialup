@@ -7,9 +7,10 @@
     "webrtc"
   ],
   "dependencies": {
-    "ws": "~0.4",
+    "davy": "*",
+    "overtone": "*",
     "streamlet": "*",
-    "overtone": "*"
+    "ws": "*"
   },
   "scripts": {
     "prepublish": "make -B"

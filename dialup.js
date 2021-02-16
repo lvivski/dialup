@@ -3,8 +3,6 @@
   if (typeof global !== "Window") {
     global = window;
   }
-  var navigator = global.navigator, RTCPeerConnection = global.mozRTCPeerConnection || global.webkitRTCPeerConnection || global.PeerConnection, getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia).bind(navigator), RTCIceCandidate = global.mozRTCIceCandidate || global.RTCIceCandidate, RTCSessionDescription = global.mozRTCSessionDescription || global.RTCSessionDescription;
-  global.URL = global.URL || global.webkitURL || global.msURL;
   var Observable, Promise, Audio;
   if (typeof define === "function" && define.amd) {
     define([ "streamlet", "davy", "overtone" ], function(streamlet, davy, overtone) {
@@ -40,7 +38,7 @@
       }
     }, servers = {
       iceServers: [ {
-        url: "stun:stun.l.google.com:19302"
+        urls: "stun:stun.l.google.com:19302"
       } ]
     }, config = {
       optional: [ {
@@ -94,10 +92,10 @@
     };
     this.createStream = function(audio, video) {
       var defer = Promise.defer();
-      getUserMedia({
+      navigator.mediaDevices.getUserMedia({
         audio: audio,
         video: video
-      }, function(stream) {
+      }).then(function(stream) {
         Audio.filter(stream);
         streams.push(stream);
         for (var i = 0; i < sockets.length; ++i) {
@@ -108,7 +106,10 @@
           stream = streams[i];
           for (socket in connections) {
             var connection = connections[socket];
-            connection.addStream(stream);
+            console.log(connection);
+            stream.getTracks().forEach(function(track) {
+              connection.addTrack(track, stream);
+            });
           }
         }
         for (socket in connections) {
@@ -132,6 +133,7 @@
         sdpMLineIndex: message.label,
         candidate: message.candidate
       });
+      console.log(message, candidate);
       connections[message.id].addIceCandidate(candidate);
     });
     this.onNew.listen(function(message) {
@@ -204,7 +206,7 @@
       var pc = new RTCPeerConnection(servers, config);
       pc.onicecandidate = function(e) {
         if (e.candidate != null) {
-          send("candidate", {
+          if (e.candidate.candidate) send("candidate", {
             label: e.candidate.sdpMLineIndex,
             id: id,
             candidate: e.candidate.candidate
@@ -223,11 +225,11 @@
           break;
         }
       };
-      pc.onaddstream = function(e) {
+      pc.ontrack = function(e) {
         controller.add({
           type: "add",
           id: id,
-          stream: e.stream
+          stream: e.streams[0]
         });
       };
       pc.onremovestream = function(e) {

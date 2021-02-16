@@ -23,7 +23,7 @@ function Dialup(url, room) {
 	    	}
 	    },
 	    servers = {
-	    	iceServers: [{ url: 'stun:stun.l.google.com:19302' }]
+	    	iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
 	    },
 	    config = {
 	    	optional: [{ DtlsSrtpKeyAgreement: true }]
@@ -92,7 +92,7 @@ function Dialup(url, room) {
 	this.createStream = function (audio, video) {
 		var defer = Promise.defer()
 
-		getUserMedia({audio: audio, video: video}, function (stream) {
+		navigator.mediaDevices.getUserMedia({audio: audio, video: video}).then(function (stream) {
 
 			Audio.filter(stream)
 
@@ -107,7 +107,10 @@ function Dialup(url, room) {
 				stream = streams[i]
 				for (socket in connections) {
 					var connection = connections[socket]
-					connection.addStream(stream)
+					console.log(connection)
+					stream.getTracks().forEach(function (track) {
+						connection.addTrack(track, stream)
+					})
 				}
 			}
 
@@ -137,6 +140,8 @@ function Dialup(url, room) {
 			sdpMLineIndex: message.label,
 			candidate: message.candidate
 		})
+
+		console.log(message, candidate)
 
 		connections[message.id].addIceCandidate(candidate)
 	})
@@ -225,11 +230,12 @@ function Dialup(url, room) {
 
 		pc.onicecandidate = function (e) {
 			if (e.candidate != null) {
-				send('candidate', {
-					label: e.candidate.sdpMLineIndex,
-					id: id,
-					candidate: e.candidate.candidate
-				})
+				if (e.candidate.candidate)
+					send('candidate', {
+						label: e.candidate.sdpMLineIndex,
+						id: id,
+						candidate: e.candidate.candidate
+					})
 			}
 		}
 
@@ -245,11 +251,19 @@ function Dialup(url, room) {
 			}
 		}
 
-		pc.onaddstream = function (e) {
+		// pc.onaddstream = function (e) {
+		// 	controller.add({
+		// 		type: 'add',
+		// 		id: id,
+		// 		stream: e.stream
+		// 	})
+		// }
+
+		pc.ontrack = function (e) {
 			controller.add({
 				type: 'add',
 				id: id,
-				stream: e.stream
+				stream: e.streams[0]
 			})
 		}
 
