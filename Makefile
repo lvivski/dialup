@@ -2,6 +2,7 @@ JS_COMPILER ?= ./node_modules/uglify-js/bin/uglifyjs
 FILES = \
 	src/util.js \
 	src/dialup.js \
+	src/ice.js \
 	src/client.js \
 
 all: \

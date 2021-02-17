@@ -22,12 +22,39 @@
     Promise = global.Davy;
     Audio = global.Overtone;
   }
+  var serversList = [ "stun.l.google.com:19302", "stun1.l.google.com:19302", "stun2.l.google.com:19302", "stun3.l.google.com:19302", "stun4.l.google.com:19302", "stun.ekiga.net", "stun.ideasip.com", "stun.rixtelecom.se", "stun.schlund.de", "stun.stunprotocol.org:3478", "stun.voiparound.com", "stun.voipbuster.com", "stun.voipstunt.com", "stun.voxgratia.org" ];
+  var iceServers = serversList.reduce(function(servers, server) {
+    var lastEntry = servers[servers.length - 1];
+    server = "stun:" + server;
+    if (lastEntry) {
+      var lastServer = lastEntry.urls[0];
+      if (trimIce(lastServer) === trimIce(server)) {
+        lastEntry.urls.push(server);
+      } else {
+        servers.push({
+          urls: [ server ]
+        });
+      }
+    } else {
+      servers.push({
+        urls: [ server ]
+      });
+    }
+    return servers;
+  }, []);
+  function trimIce(server) {
+    return server.replace(/^stun\d*\./, "").replace(/:\d+$/, "");
+  }
   function Dialup(url, room) {
     var me = null, sockets = [], connections = {}, data = {}, streams = [], controller = Observable.control(), stream = controller.stream, ws = new WebSocket(url);
     var constraints = {
       offerToReceiveAudio: true,
       offerToReceiveVideo: true
     };
+    var configuration = {
+      iceServers: iceServers
+    };
+    console.log(configuration);
     ws.onopen = function() {
       send("join", {
         room: room || ""
@@ -187,7 +214,8 @@
       data[id] = channel;
     }
     function createPeerConnection(id) {
-      var pc = new RTCPeerConnection();
+      console.log(configuration);
+      var pc = new RTCPeerConnection(configuration);
       pc.onicecandidate = function(e) {
         if (e.candidate != null) {
           send("candidate", {
@@ -208,6 +236,9 @@
           pc.onicecandidate = function() {};
           break;
         }
+      };
+      pc.onicecandidateerror = function(e) {
+        console.log(e);
       };
       pc.ontrack = function(e) {
         controller.add({

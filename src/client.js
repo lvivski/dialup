@@ -13,6 +13,10 @@ function Dialup(url, room) {
 		offerToReceiveVideo: true
 	}
 
+	var configuration = {
+		iceServers: iceServers
+	}
+
 	ws.onopen = function () {
 		send('join', {
 			room: room || ''
@@ -220,7 +224,7 @@ function Dialup(url, room) {
 	}
 
 	function createPeerConnection(id) {
-		var pc = new RTCPeerConnection()
+		var pc = new RTCPeerConnection(configuration)
 
 		pc.onicecandidate = function (e) {
 			if (e.candidate != null) {
@@ -242,6 +246,10 @@ function Dialup(url, room) {
 					pc.onicecandidate = function () {}
 					break
 			}
+		}
+
+		pc.onicecandidateerror = function (e) {
+			console.log(e)
 		}
 
 		// pc.onaddstream = function (e) {
