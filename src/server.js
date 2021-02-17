@@ -1,30 +1,22 @@
 'use strict'
 
-var WebSocket = require('ws').Server,
-    Observable = require('streamlet')
+const WebSocket = require('ws').Server
+const Streamlet = require('streamlet')
 
-var Dialup = module.exports = function (options) {
-	var sockets = {},
-	    rooms = {},
-	    controller = Observable.control(),
-		stream = controller.stream,
-	    ws = new WebSocket(options)
+module.exports = function Dialup(options) {
+	const sockets = {}
+  const rooms = {}
+  const controller = Streamlet.control()
+	const stream = controller.stream
+	const ws = new WebSocket(options)
 
-	this.onJoin = stream.filter(function (message) {
-		return message.type === 'join'
-	})
+	this.onJoin = stream.filter(message => message.type === 'join')
 
-	this.onOffer = stream.filter(function (message) {
-		return message.type === 'offer'
-	})
+	this.onOffer = stream.filter(message => message.type === 'offer')
 
-	this.onAnswer = stream.filter(function (message) {
-		return message.type === 'answer'
-	})
+	this.onAnswer = stream.filter(message => message.type === 'answer')
 
-	this.onCandidate = stream.filter(function (message) {
-		return message.type === 'candidate'
-	})
+	this.onCandidate = stream.filter(message => message.type === 'candidate')
 
 	this.onJoin.listen(function (message) {
 		var socket = message._socket;

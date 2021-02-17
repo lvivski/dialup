@@ -9,7 +9,6 @@
   "dependencies": {
     "overtone": "*",
     "streamlet": "*",
-		"davy": "*",
     "ws": "*"
   },
   "scripts": {

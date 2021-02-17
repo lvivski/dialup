@@ -1,19 +1,19 @@
 function Dialup(url, room) {
-	var me = null,
-	    sockets = [],
-	    connections = {},
-	    data = {},
-	    streams = [],
-	    controller = Observable.control(),
-			stream = controller.stream,
-			ws = new WebSocket(url)
+	let me = null
+	const sockets = []
+	const connections = {}
+	const data = {}
+	const streams = []
+	const controller = Streamlet.control()
+	const stream = controller.stream
+	const ws = new WebSocket(url)
 
-	var constraints = {
+	const constraints = {
 		offerToReceiveAudio: true,
 		offerToReceiveVideo: true
 	}
 
-	var configuration = {
+	const configuration = {
 		iceServers: iceServers
 	}
 
@@ -29,101 +29,78 @@ function Dialup(url, room) {
 		controller.add(JSON.parse(e.data))
 	}
 
-	this.onOffer = stream.filter(function (message) {
-		return message.type === 'offer'
-	})
+	this.onOffer = stream.filter(message => message.type === 'offer')
 
-	this.onAnswer = stream.filter(function (message) {
-		return message.type === 'answer'
-	})
+	this.onAnswer = stream.filter(message => message.type === 'answer')
 
-	this.onCandidate = stream.filter(function (message) {
-		return message.type === 'candidate'
-	})
+	this.onCandidate = stream.filter(message => message.type === 'candidate')
 
-	this.onNew = stream.filter(function (message) {
-		return message.type === 'new'
-	})
+	this.onNew = stream.filter(message => message.type === 'new')
 
-	this.onPeers = stream.filter(function (message) {
-		return message.type === 'peers'
-	})
+	this.onPeers = stream.filter(message => message.type === 'peers')
 
-	this.onLeave = stream.filter(function (message) {
-		return message.type === 'leave'
-	})
+	this.onLeave = stream.filter(message => message.type === 'leave')
 
-	this.onAdd = stream.filter(function (message) {
-		return message.type === 'add'
-	})
+	this.onAdd = stream.filter(message => message.type === 'add')
 
-	this.onRemove = stream.filter(function (message) {
-		return message.type === 'remove'
-	})
-
-	this.onData = stream.filter(function (message) {
-		return message.type === 'data'
-	})
+	this.onData = stream.filter(message => message.type === 'data')
 
 	this.broadcast = function (message) {
-		for (var k in data) {
+		for (const k in data) {
 			this.send(k, message)
 		}
 	}
 
 	this.send = function (id, message) {
-		var d = data[id]
+		const d = data[id]
 		if (d.readyState === 'open')
 			d.send(message)
 	}
 
 	this.createStream = function (audio, video) {
-		var defer = Promise.defer()
+		return navigator.mediaDevices.getUserMedia({
+			audio: audio,
+			video: video
+		}).then(function (stream) {
 
-		navigator.mediaDevices.getUserMedia({audio: audio, video: video}).then(function (stream) {
-
-			Audio.filter(stream)
+			Overtone.filter(stream)
 
 			streams.push(stream)
 
-			for (var i = 0; i < sockets.length; ++i) {
-				var socket = sockets[i]
+			for (const socket of sockets) {
 				connections[socket] = createPeerConnection(socket)
 			}
 
-			for (i = 0; i < streams.length; ++i) {
-				stream = streams[i]
-				for (socket in connections) {
-					var connection = connections[socket]
+			for (const stream of streams) {
+				for (const socket in connections) {
+					const connection = connections[socket]
 					stream.getTracks().forEach(function (track) {
 						connection.addTrack(track, stream)
 					})
 				}
 			}
 
-			for (socket in connections) {
-				connection = connections[socket]
+			for (const socket in connections) {
+				const connection = connections[socket]
 				createDataChannel(socket, connection)
 				createOffer(socket, connection)
 			}
 
-			defer.fulfill(stream)
+			return stream
 		})
-
-		return defer.promise
 	}
 
 	this.onPeers.listen(function (message) {
 		me = message.you
 
-		for (var i in message.connections) {
-			var connection = message.connections[i]
+		for (const i in message.connections) {
+			const connection = message.connections[i]
 			sockets.push(connection)
 		}
 	})
 
 	this.onCandidate.listen(function (message) {
-		var candidate = new RTCIceCandidate({
+		const candidate = new RTCIceCandidate({
 			sdpMLineIndex: message.label,
 			candidate: message.candidate
 		})
@@ -134,8 +111,8 @@ function Dialup(url, room) {
 	})
 
 	this.onNew.listen(function (message) {
-		var id = message.id,
-		    pc = createPeerConnection(id)
+		const id = message.id
+		const pc = createPeerConnection(id)
 
 		sockets.push(id)
 		connections[id] = pc
@@ -147,20 +124,20 @@ function Dialup(url, room) {
 	})
 
 	this.onLeave.listen(function (message) {
-		var id = message.id
+		const id = message.id
 		delete connections[id]
 		delete data[id]
 		sockets.splice(sockets.indexOf(id), 1)
 	})
 
 	this.onOffer.listen(function (message) {
-		var pc = connections[message.id]
+		const pc = connections[message.id]
 		pc.setRemoteDescription(new RTCSessionDescription(message.description))
 		createAnswer(message.id, pc)
 	})
 
 	this.onAnswer.listen(function (message) {
-		var pc = connections[message.id]
+		const pc = connections[message.id]
 		pc.setRemoteDescription(new RTCSessionDescription(message.description))
 	})
 
@@ -203,7 +180,7 @@ function Dialup(url, room) {
 	function createDataChannel(id, pc, label) {
 		label || (label = 'dataChannel')
 
-		var channel = pc.createDataChannel(label)
+		const channel = pc.createDataChannel(label)
 		addDataChannel(id, channel)
 	}
 
@@ -224,7 +201,7 @@ function Dialup(url, room) {
 	}
 
 	function createPeerConnection(id) {
-		var pc = new RTCPeerConnection(configuration)
+		const pc = new RTCPeerConnection(configuration)
 
 		pc.onicecandidate = function (e) {
 			if (e.candidate != null) {
@@ -252,14 +229,6 @@ function Dialup(url, room) {
 			console.log(e)
 		}
 
-		// pc.onaddstream = function (e) {
-		// 	controller.add({
-		// 		type: 'add',
-		// 		id: id,
-		// 		stream: e.stream
-		// 	})
-		// }
-
 		pc.ontrack = function (e) {
 			controller.add({
 				type: 'add',
@@ -267,14 +236,6 @@ function Dialup(url, room) {
 				stream: e.streams[0]
 			})
 		}
-
-		// pc.onremovestream = function (e) {
-		// 	controller.add({
-		// 		type: 'remove',
-		// 		id: id,
-		// 		stream: e.stream
-		// 	})
-		// }
 
 		pc.ondatachannel = function (e) {
 			addDataChannel(id, e.channel)
