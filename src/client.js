@@ -51,8 +51,8 @@ function Dialup(url, room) {
 		}
 	}
 
-	this.send = function (id, message) {
-		const d = data[id]
+	this.send = function (socket, message) {
+		const d = data[socket]
 		if (d.readyState === 'open')
 			d.send(message)
 	}
@@ -93,29 +93,27 @@ function Dialup(url, room) {
 	this.onPeers.listen(function (message) {
 		me = message.you
 
-		for (const i in message.connections) {
-			const connection = message.connections[i]
-			sockets.push(connection)
+		for (const socket of message.connections) {
+			sockets.push(socket)
 		}
 	})
 
 	this.onCandidate.listen(function (message) {
+		const socket = message.id
 		const candidate = new RTCIceCandidate({
 			sdpMLineIndex: message.label,
 			candidate: message.candidate
 		})
 
-		connections[message.id].addIceCandidate(candidate).catch(function (e) {
-			console.log(e)
-		})
+		connections[socket].addIceCandidate(candidate)
 	})
 
 	this.onNew.listen(function (message) {
-		const id = message.id
-		const pc = createPeerConnection(id)
+		const socket = message.id
+		const pc = createPeerConnection(socket)
 
-		sockets.push(id)
-		connections[id] = pc
+		sockets.push(socket)
+		connections[socket] = pc
 		streams.forEach(function (stream) {
 			stream.getTracks().forEach(function (track) {
 				pc.addTrack(track, stream)
@@ -124,90 +122,86 @@ function Dialup(url, room) {
 	})
 
 	this.onLeave.listen(function (message) {
-		const id = message.id
-		delete connections[id]
-		delete data[id]
-		sockets.splice(sockets.indexOf(id), 1)
+		const socket = message.id
+		delete connections[socket]
+		delete data[socket]
+		sockets.splice(sockets.indexOf(socket), 1)
 	})
 
 	this.onOffer.listen(function (message) {
-		const pc = connections[message.id]
+		const socket = message.id
+		const pc = connections[socket]
 		pc.setRemoteDescription(new RTCSessionDescription(message.description))
-		createAnswer(message.id, pc)
+		createAnswer(socket, pc)
 	})
 
 	this.onAnswer.listen(function (message) {
-		const pc = connections[message.id]
+		const socket = message.id
+		const pc = connections[socket]
 		pc.setRemoteDescription(new RTCSessionDescription(message.description))
 	})
 
 	function createOffer(socket, pc) {
-		pc.createOffer(constraints).then(
-			function (session) {
-				pc.setLocalDescription(session).then(
-					function() {
-						send('offer', {
-							id: socket,
-							description: {
-								sdp: session.sdp,
-								type: session.type
-							}
-						})
+		pc.createOffer(constraints)
+			.then(offer => pc.setLocalDescription(offer))
+			.then(offer =>
+				send('offer', {
+					id: socket,
+					description: {
+						sdp: offer.sdp,
+						type: offer.type
 					}
-				)
-
-			},
-			function () {}
-		)
+				}),
+				function () {}
+			)
 	}
 
 	function createAnswer(socket, pc) {
-		pc.createAnswer().then(
-			function (session) {
-				pc.setLocalDescription(session)
+		pc.createAnswer()
+			.then(answer => pc.setLocalDescription(answer))
+			.then(answer =>
 				send('answer', {
 					id: socket,
 					description: {
-						sdp: session.sdp,
-						type: session.type
+						sdp: answer.sdp,
+						type: answer.type
 					}
-				})
-			},
-			function () {}
-		)
+				}),
+				function () {}
+			)
 	}
 
-	function createDataChannel(id, pc, label) {
+	function createDataChannel(socket, pc, label) {
 		label || (label = 'dataChannel')
 
 		const channel = pc.createDataChannel(label)
-		addDataChannel(id, channel)
+		addDataChannel(socket, channel)
 	}
 
-	function addDataChannel(id, channel) {
+	function addDataChannel(socket, channel) {
 		channel.onopen = function () {}
 
 		channel.onmessage = function (e) {
 			controller.add({
+				id: socket,
 				type: 'data',
-				id: id,
 				data: e.data
 			})
 		}
 
 		channel.onclose = function () {}
 
-		data[id] = channel
+		data[socket] = channel
 	}
 
-	function createPeerConnection(id) {
+	function createPeerConnection(socket) {
 		const pc = new RTCPeerConnection(configuration)
 
 		pc.onicecandidate = function (e) {
-			if (e.candidate != null) {
+			if (e.candidate && e.candidate.candidate) {
 				send('candidate', {
+					id: socket,
 					label: e.candidate.sdpMLineIndex,
-					id: id,
 					candidate: e.candidate.candidate
 				})
 			}
@@ -231,14 +225,14 @@ function Dialup(url, room) {
 
 		pc.ontrack = function (e) {
 			controller.add({
+				id: socket,
 				type: 'add',
-				id: id,
 				stream: e.streams[0]
 			})
 		}
 
 		pc.ondatachannel = function (e) {
-			addDataChannel(id, e.channel)
+			addDataChannel(socket, e.channel)
 		}
 
 		return pc
