@@ -19,7 +19,7 @@ module.exports = function Dialup(options) {
 	this.onCandidate = stream.filter(message => message.type === 'candidate')
 
 	this.onJoin.listen(function (message) {
-		var socket = message._socket;
+		var socket = message._socket
 
 		if (rooms[message.room] == null) {
 			rooms[message.room] = []
@@ -36,21 +36,21 @@ module.exports = function Dialup(options) {
 			type: 'peers',
 			connections: rooms[message.room],
 			you: socket.hashCode
-		}));
+		}))
 
 		rooms[message.room].push(socket.hashCode)
 	})
 
 	this.onOffer.listen(function (message) {
 		var socket = message._socket,
-		    soc = sockets[message.id];
+		    soc = sockets[message.id]
 
 		soc.send(JSON.stringify({
 			type: 'offer',
 			description: message.description,
 			id: socket.hashCode
-		}));
-	});
+		}))
+	})
 
 	this.onAnswer.listen(function (message) {
 		var socket = message._socket,
@@ -78,7 +78,7 @@ module.exports = function Dialup(options) {
 	ws.on('connection', function (socket) {
 		socket.hashCode = Math.random().toString(36).slice(2)
 
-		sockets[socket.hashCode] = socket;
+		sockets[socket.hashCode] = socket
 
 		socket.on('message', function (message) {
 			message = JSON.parse(message)
