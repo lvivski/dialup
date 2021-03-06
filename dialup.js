@@ -40,7 +40,7 @@
     return servers;
   }, []);
   function trimIce(server) {
-    return server.replace(/^stun\d*\./, "").replace(/:\d+$/, "");
+    return server.replace(/^stun:stun\d*\./, "").replace(/:\d+$/, "");
   }
   function Channel(url, room) {
     const controller = Streamlet.control();
@@ -60,6 +60,7 @@
       ws.send(JSON.stringify(data));
     }
     this.send = send;
+    this.onJoin = stream.filter(message => message.type === "join");
     this.onOffer = stream.filter(message => message.type === "offer");
     this.onAnswer = stream.filter(message => message.type === "answer");
     this.onCandidate = stream.filter(message => message.type === "candidate");
@@ -77,7 +78,7 @@
   function Dialup(url, room) {
     let me = null;
     const channel = new Channel(url, room);
-    const sockets = [];
+    const clientIds = [];
     const connections = {};
     const data = {};
     const streams = [];
@@ -88,14 +89,14 @@
     this.onPeers = channel.onPeers;
     this.onLeave = channel.onLeave;
     this.broadcast = function(message) {
-      for (const socket in data) {
-        this.send(socket, message);
+      for (const clientId in data) {
+        this.send(clientId, message);
       }
     };
-    this.send = function(socket, message) {
-      const dataConnection = data[socket];
-      if (dataConnection.readyState === "open") {
-        dataConnection.send(message);
+    this.send = function(clientId, message) {
+      const dc = data[clientId];
+      if (dc.readyState === "open") {
+        dc.send(message);
       }
     };
     this.createStream = function(audio, video) {
@@ -105,44 +106,34 @@
       }).then(function(stream) {
         Overtone.filter(stream);
         streams.push(stream);
-        for (const socket of sockets) {
-          connections[socket] = createPeerConnection(socket);
-        }
-        for (const stream of streams) {
-          for (const socket in connections) {
-            const connection = connections[socket];
+        for (const id of clientIds) {
+          const connection = connections[id] = createPeerConnection(id);
+          for (const stream of streams) {
             stream.getTracks().forEach(function(track) {
               connection.addTrack(track, stream);
             });
           }
-        }
-        for (const socket in connections) {
-          const connection = connections[socket];
-          createDataChannel(socket, connection);
-          createOffer(socket, connection);
+          createDataChannel(id, connection);
+          createOffer(id, connection);
         }
         return stream;
       });
     };
     channel.onPeers.listen(function(message) {
       me = message.you;
-      for (const socket of message.connections) {
-        sockets.push(socket);
+      for (const id of message.connections) {
+        clientIds.push(id);
       }
     });
     channel.onCandidate.listen(function(message) {
-      const socket = message.id;
-      const candidate = new RTCIceCandidate({
-        sdpMLineIndex: message.label,
-        candidate: message.candidate
-      });
-      connections[socket].addIceCandidate(candidate);
+      const clientId = message.id;
+      connections[clientId].addIceCandidate(message.candidate);
     });
     channel.onNew.listen(function(message) {
-      const socket = message.id;
-      const pc = createPeerConnection(socket);
-      sockets.push(socket);
-      connections[socket] = pc;
+      const clientId = message.id;
+      const pc = createPeerConnection(clientId);
+      clientIds.push(clientId);
+      connections[clientId] = pc;
       streams.forEach(function(stream) {
         stream.getTracks().forEach(function(track) {
           pc.addTrack(track, stream);
@@ -150,59 +141,58 @@
       });
     });
     channel.onLeave.listen(function(message) {
-      const socket = message.id;
-      delete connections[socket];
-      delete data[socket];
-      sockets.splice(sockets.indexOf(socket), 1);
+      const clientId = message.id;
+      delete connections[clientId];
+      delete data[clientId];
+      clientIds.splice(clientIds.indexOf(clientId), 1);
     });
     channel.onOffer.listen(function(message) {
-      const socket = message.id;
-      const pc = connections[socket];
+      const clientId = message.id;
+      const pc = connections[clientId];
       pc.setRemoteDescription(message.description);
-      createAnswer(socket, pc);
+      createAnswer(clientId, pc);
     });
     channel.onAnswer.listen(function(message) {
-      const socket = message.id;
-      const pc = connections[socket];
+      const clientId = message.id;
+      const pc = connections[clientId];
       pc.setRemoteDescription(message.description);
     });
-    function createOffer(socket, pc) {
+    function createOffer(clientId, pc) {
       pc.createOffer(constraints).then(offer => pc.setLocalDescription(offer)).then(() => channel.send("offer", {
-        id: socket,
+        id: clientId,
         description: pc.localDescription
       }), function() {});
     }
-    function createAnswer(socket, pc) {
+    function createAnswer(clientId, pc) {
       pc.createAnswer().then(answer => pc.setLocalDescription(answer)).then(() => channel.send("answer", {
-        id: socket,
+        id: clientId,
         description: pc.localDescription
       }), function() {});
     }
-    function createDataChannel(socket, pc, label) {
+    function createDataChannel(clientId, pc, label) {
       label || (label = "dataChannel");
-      const channel = pc.createDataChannel(label);
-      addDataChannel(socket, channel);
+      const dc = pc.createDataChannel(label);
+      addDataChannel(clientId, dc);
     }
-    function addDataChannel(socket, channel) {
-      channel.onopen = function() {};
-      channel.onmessage = function(e) {
+    function addDataChannel(clientId, dc) {
+      dc.onopen = function() {};
+      dc.onmessage = function(e) {
         controller.add({
-          id: socket,
+          id: clientId,
           type: "data",
           data: e.data
         });
       };
-      channel.onclose = function() {};
-      data[socket] = channel;
+      dc.onclose = function() {};
+      data[clientId] = dc;
     }
-    function createPeerConnection(socket) {
+    function createPeerConnection(clientId) {
       const pc = new RTCPeerConnection(configuration);
       pc.onicecandidate = function(e) {
         if (e.candidate && e.candidate.candidate) {
           channel.send("candidate", {
-            id: socket,
-            label: e.candidate.sdpMLineIndex,
-            candidate: e.candidate.candidate
+            id: clientId,
+            candidate: e.candidate
           });
         }
       };
@@ -223,13 +213,13 @@
       };
       pc.ontrack = function(e) {
         controller.add({
-          id: socket,
+          id: clientId,
           type: "add",
           stream: e.streams[0]
         });
       };
       pc.ondatachannel = function(e) {
-        addDataChannel(socket, e.channel);
+        addDataChannel(clientId, e.channel);
       };
       return pc;
     }
