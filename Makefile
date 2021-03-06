@@ -3,6 +3,7 @@ FILES = \
 	src/util.js \
 	src/dialup.js \
 	src/ice.js \
+	src/channel.js \
 	src/client.js \
 
 all: \

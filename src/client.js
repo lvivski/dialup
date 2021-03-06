@@ -1,60 +1,38 @@
+const constraints = {
+	offerToReceiveAudio: true,
+	offerToReceiveVideo: true
+}
+
+const configuration = {
+	iceServers: iceServers
+}
+
 function Dialup(url, room) {
 	let me = null
+	const channel = new Channel(url, room)
 	const sockets = []
 	const connections = {}
 	const data = {}
 	const streams = []
+
 	const controller = Streamlet.control()
 	const stream = controller.stream
-	const ws = new WebSocket(url)
 
-	const constraints = {
-		offerToReceiveAudio: true,
-		offerToReceiveVideo: true
-	}
-
-	const configuration = {
-		iceServers: iceServers
-	}
-
-	ws.onopen = function () {
-		send('join', {
-			room: room || ''
-		})
-	}
-
-	ws.onerror = function () {}
-
-	ws.onmessage = function (e) {
-		controller.add(JSON.parse(e.data))
-	}
-
-	this.onOffer = stream.filter(message => message.type === 'offer')
-
-	this.onAnswer = stream.filter(message => message.type === 'answer')
-
-	this.onCandidate = stream.filter(message => message.type === 'candidate')
-
-	this.onNew = stream.filter(message => message.type === 'new')
-
-	this.onPeers = stream.filter(message => message.type === 'peers')
-
-	this.onLeave = stream.filter(message => message.type === 'leave')
 
 	this.onAdd = stream.filter(message => message.type === 'add')
-
 	this.onData = stream.filter(message => message.type === 'data')
 
 	this.broadcast = function (message) {
-		for (const k in data) {
-			this.send(k, message)
+		for (const socket in data) {
+			this.send(socket, message)
 		}
 	}
 
 	this.send = function (socket, message) {
-		const d = data[socket]
-		if (d.readyState === 'open')
-			d.send(message)
+		const dataConnection = data[socket]
+		if (dataConnection.readyState === 'open') {
+			dataConnection.send(message)
+		}
 	}
 
 	this.createStream = function (audio, video) {
@@ -90,7 +68,7 @@ function Dialup(url, room) {
 		})
 	}
 
-	this.onPeers.listen(function (message) {
+	channel.onPeers.listen(function (message) {
 		me = message.you
 
 		for (const socket of message.connections) {
@@ -98,7 +76,7 @@ function Dialup(url, room) {
 		}
 	})
 
-	this.onCandidate.listen(function (message) {
+	channel.onCandidate.listen(function (message) {
 		const socket = message.id
 		const candidate = new RTCIceCandidate({
 			sdpMLineIndex: message.label,
@@ -108,7 +86,7 @@ function Dialup(url, room) {
 		connections[socket].addIceCandidate(candidate)
 	})
 
-	this.onNew.listen(function (message) {
+	channel.onNew.listen(function (message) {
 		const socket = message.id
 		const pc = createPeerConnection(socket)
 
@@ -121,21 +99,21 @@ function Dialup(url, room) {
 		})
 	})
 
-	this.onLeave.listen(function (message) {
+	channel.onLeave.listen(function (message) {
 		const socket = message.id
 		delete connections[socket]
 		delete data[socket]
 		sockets.splice(sockets.indexOf(socket), 1)
 	})
 
-	this.onOffer.listen(function (message) {
+	channel.onOffer.listen(function (message) {
 		const socket = message.id
 		const pc = connections[socket]
 		pc.setRemoteDescription(new RTCSessionDescription(message.description))
 		createAnswer(socket, pc)
 	})
 
-	this.onAnswer.listen(function (message) {
+	channel.onAnswer.listen(function (message) {
 		const socket = message.id
 		const pc = connections[socket]
 		pc.setRemoteDescription(new RTCSessionDescription(message.description))
@@ -145,7 +123,7 @@ function Dialup(url, room) {
 		pc.createOffer(constraints)
 			.then(offer => pc.setLocalDescription(offer))
 			.then(offer =>
-				send('offer', {
+				channel.send('offer', {
 					id: socket,
 					description: {
 						sdp: offer.sdp,
@@ -160,7 +138,7 @@ function Dialup(url, room) {
 		pc.createAnswer()
 			.then(answer => pc.setLocalDescription(answer))
 			.then(answer =>
-				send('answer', {
+				channel.send('answer', {
 					id: socket,
 					description: {
 						sdp: answer.sdp,
@@ -199,7 +177,7 @@ function Dialup(url, room) {
 
 		pc.onicecandidate = function (e) {
 			if (e.candidate && e.candidate.candidate) {
-				send('candidate', {
+				channel.send('candidate', {
 					id: socket,
 					label: e.candidate.sdpMLineIndex,
 					candidate: e.candidate.candidate
@@ -236,10 +214,5 @@ function Dialup(url, room) {
 		}
 
 		return pc
-	}
-
-	function send(event, data) {
-		data.type = event
-		ws.send(JSON.stringify(data))
 	}
 }
