@@ -1,6 +1,6 @@
 'use strict'
 
-const WebSocket = require('ws').Server
+const WebSocketServer = require('ws').Server
 const Streamlet = require('streamlet')
 
 module.exports = function Dialup(options) {
@@ -8,7 +8,7 @@ module.exports = function Dialup(options) {
   const rooms = {}
   const controller = Streamlet.control()
 	const stream = controller.stream
-	const ws = new WebSocket(options)
+	const wss = new WebSocketServer(options)
 
 	this.onJoin = stream.filter(message => message.type === 'join')
 	this.onOffer = stream.filter(message => message.type === 'offer')
@@ -16,7 +16,7 @@ module.exports = function Dialup(options) {
 	this.onCandidate = stream.filter(message => message.type === 'candidate')
 
 	this.onJoin.listen(function (message) {
-		const socket = message._socket
+		const socket = message.origin
 
 		if (rooms[message.room] == null) {
 			rooms[message.room] = []
@@ -25,17 +25,17 @@ module.exports = function Dialup(options) {
 		rooms[message.room].forEach(function (client) {
 			sockets[client].send(JSON.stringify({
 				type: 'new',
-				id: socket.hashCode
+				id: socket.clientId
 			}))
 		})
 
 		socket.send(JSON.stringify({
 			type: 'peers',
 			connections: rooms[message.room],
-			you: socket.hashCode
+			you: socket.clientId
 		}))
 
-		rooms[message.room].push(socket.hashCode)
+		rooms[message.room].push(socket.clientId)
 	})
 
 	this.onOffer.listen(relay)
@@ -45,30 +45,31 @@ module.exports = function Dialup(options) {
 	this.onCandidate.listen(relay)
 
 	function relay(message) {
-		const from = message._socket
+		const from = message.origin
 		const socket = sockets[message.id]
 
-		delete message._socket
+		delete message.origin
 
 		socket.send(JSON.stringify({
 			...message,
-			id: from.hashCode
+			id: from.clientId
 		}))
 	}
 
-	ws.on('connection', function (socket) {
-		socket.hashCode = Math.random().toString(36).slice(2)
+	wss.on('connection', function (socket) {
+		socket.clientId = Math.random().toString(36).slice(2)
 
-		sockets[socket.hashCode] = socket
+		sockets[socket.clientId] = socket
 
 		socket.on('message', function (message) {
 			message = JSON.parse(message)
-			message._socket = socket
+			message.origin = socket
+
 			controller.add(message)
 		})
 
 		socket.on('close', function () {
-			const id = socket.hashCode
+			const id = socket.clientId
 			delete sockets[id]
 
 			for (const room in rooms) {
