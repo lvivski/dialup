@@ -21,6 +21,7 @@ function Channel(url, room) {
 	}
 	this.send = send
 
+	this.onJoin = stream.filter(message => message.type === 'join')
 	this.onOffer = stream.filter(message => message.type === 'offer')
 	this.onAnswer = stream.filter(message => message.type === 'answer')
 	this.onCandidate = stream.filter(message => message.type === 'candidate')
