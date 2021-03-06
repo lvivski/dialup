@@ -33,5 +33,5 @@ var iceServers = serversList.reduce(function (servers, server) {
 }, [])
 
 function trimIce(server) {
-	return server.replace(/^stun\d*\./, '').replace(/:\d+$/, '')
+	return server.replace(/^stun:stun\d*\./, '').replace(/:\d+$/, '')
 }
