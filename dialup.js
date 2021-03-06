@@ -42,22 +42,10 @@
   function trimIce(server) {
     return server.replace(/^stun\d*\./, "").replace(/:\d+$/, "");
   }
-  function Dialup(url, room) {
-    let me = null;
-    const sockets = [];
-    const connections = {};
-    const data = {};
-    const streams = [];
+  function Channel(url, room) {
     const controller = Streamlet.control();
     const stream = controller.stream;
     const ws = new WebSocket(url);
-    const constraints = {
-      offerToReceiveAudio: true,
-      offerToReceiveVideo: true
-    };
-    const configuration = {
-      iceServers: iceServers
-    };
     ws.onopen = function() {
       send("join", {
         room: room || ""
@@ -67,22 +55,48 @@
     ws.onmessage = function(e) {
       controller.add(JSON.parse(e.data));
     };
+    function send(message, data) {
+      data.type = message;
+      ws.send(JSON.stringify(data));
+    }
+    this.send = send;
     this.onOffer = stream.filter(message => message.type === "offer");
     this.onAnswer = stream.filter(message => message.type === "answer");
     this.onCandidate = stream.filter(message => message.type === "candidate");
     this.onNew = stream.filter(message => message.type === "new");
     this.onPeers = stream.filter(message => message.type === "peers");
     this.onLeave = stream.filter(message => message.type === "leave");
+  }
+  const constraints = {
+    offerToReceiveAudio: true,
+    offerToReceiveVideo: true
+  };
+  const configuration = {
+    iceServers: iceServers
+  };
+  function Dialup(url, room) {
+    let me = null;
+    const channel = new Channel(url, room);
+    const sockets = [];
+    const connections = {};
+    const data = {};
+    const streams = [];
+    const controller = Streamlet.control();
+    const stream = controller.stream;
     this.onAdd = stream.filter(message => message.type === "add");
     this.onData = stream.filter(message => message.type === "data");
+    this.onPeers = channel.onPeers;
+    this.onLeave = channel.onLeave;
     this.broadcast = function(message) {
-      for (const k in data) {
-        this.send(k, message);
+      for (const socket in data) {
+        this.send(socket, message);
       }
     };
     this.send = function(socket, message) {
-      const d = data[socket];
-      if (d.readyState === "open") d.send(message);
+      const dataConnection = data[socket];
+      if (dataConnection.readyState === "open") {
+        dataConnection.send(message);
+      }
     };
     this.createStream = function(audio, video) {
       return navigator.mediaDevices.getUserMedia({
@@ -110,13 +124,13 @@
         return stream;
       });
     };
-    this.onPeers.listen(function(message) {
+    channel.onPeers.listen(function(message) {
       me = message.you;
       for (const socket of message.connections) {
         sockets.push(socket);
       }
     });
-    this.onCandidate.listen(function(message) {
+    channel.onCandidate.listen(function(message) {
       const socket = message.id;
       const candidate = new RTCIceCandidate({
         sdpMLineIndex: message.label,
@@ -124,7 +138,7 @@
       });
       connections[socket].addIceCandidate(candidate);
     });
-    this.onNew.listen(function(message) {
+    channel.onNew.listen(function(message) {
       const socket = message.id;
       const pc = createPeerConnection(socket);
       sockets.push(socket);
@@ -135,39 +149,33 @@
         });
       });
     });
-    this.onLeave.listen(function(message) {
+    channel.onLeave.listen(function(message) {
       const socket = message.id;
       delete connections[socket];
       delete data[socket];
       sockets.splice(sockets.indexOf(socket), 1);
     });
-    this.onOffer.listen(function(message) {
+    channel.onOffer.listen(function(message) {
       const socket = message.id;
       const pc = connections[socket];
-      pc.setRemoteDescription(new RTCSessionDescription(message.description));
+      pc.setRemoteDescription(message.description);
       createAnswer(socket, pc);
     });
-    this.onAnswer.listen(function(message) {
+    channel.onAnswer.listen(function(message) {
       const socket = message.id;
       const pc = connections[socket];
-      pc.setRemoteDescription(new RTCSessionDescription(message.description));
+      pc.setRemoteDescription(message.description);
     });
     function createOffer(socket, pc) {
-      pc.createOffer(constraints).then(offer => pc.setLocalDescription(offer)).then(offer => send("offer", {
+      pc.createOffer(constraints).then(offer => pc.setLocalDescription(offer)).then(() => channel.send("offer", {
         id: socket,
-        description: {
-          sdp: offer.sdp,
-          type: offer.type
-        }
+        description: pc.localDescription
       }), function() {});
     }
     function createAnswer(socket, pc) {
-      pc.createAnswer().then(answer => pc.setLocalDescription(answer)).then(answer => send("answer", {
+      pc.createAnswer().then(answer => pc.setLocalDescription(answer)).then(() => channel.send("answer", {
         id: socket,
-        description: {
-          sdp: answer.sdp,
-          type: answer.type
-        }
+        description: pc.localDescription
       }), function() {});
     }
     function createDataChannel(socket, pc, label) {
@@ -191,7 +199,7 @@
       const pc = new RTCPeerConnection(configuration);
       pc.onicecandidate = function(e) {
         if (e.candidate && e.candidate.candidate) {
-          send("candidate", {
+          channel.send("candidate", {
             id: socket,
             label: e.candidate.sdpMLineIndex,
             candidate: e.candidate.candidate
@@ -224,10 +232,6 @@
         addDataChannel(socket, e.channel);
       };
       return pc;
-    }
-    function send(event, data) {
-      data.type = event;
-      ws.send(JSON.stringify(data));
     }
   }
 })(this);

@@ -21,6 +21,8 @@ function Dialup(url, room) {
 
 	this.onAdd = stream.filter(message => message.type === 'add')
 	this.onData = stream.filter(message => message.type === 'data')
+	this.onPeers = channel.onPeers
+	this.onLeave = channel.onLeave
 
 	this.broadcast = function (message) {
 		for (const socket in data) {
@@ -109,26 +111,23 @@ function Dialup(url, room) {
 	channel.onOffer.listen(function (message) {
 		const socket = message.id
 		const pc = connections[socket]
-		pc.setRemoteDescription(new RTCSessionDescription(message.description))
+		pc.setRemoteDescription(message.description)
 		createAnswer(socket, pc)
 	})
 
 	channel.onAnswer.listen(function (message) {
 		const socket = message.id
 		const pc = connections[socket]
-		pc.setRemoteDescription(new RTCSessionDescription(message.description))
+		pc.setRemoteDescription(message.description)
 	})
 
 	function createOffer(socket, pc) {
 		pc.createOffer(constraints)
 			.then(offer => pc.setLocalDescription(offer))
-			.then(offer =>
+			.then(() =>
 				channel.send('offer', {
 					id: socket,
-					description: {
-						sdp: offer.sdp,
-						type: offer.type
-					}
+					description: pc.localDescription
 				}),
 				function () {}
 			)
@@ -137,13 +136,10 @@ function Dialup(url, room) {
 	function createAnswer(socket, pc) {
 		pc.createAnswer()
 			.then(answer => pc.setLocalDescription(answer))
-			.then(answer =>
+			.then(() =>
 				channel.send('answer', {
 					id: socket,
-					description: {
-						sdp: answer.sdp,
-						type: answer.type
-					}
+					description: pc.localDescription
 				}),
 				function () {}
 			)
