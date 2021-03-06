@@ -1,6 +1,6 @@
 {
 	"name": "dialup",
-	"version": "0.1.2",
+	"version": "0.2.0",
 	"main": [
 		"dialup.js"
 	],
@@ -12,7 +12,6 @@
 		"package.json"
 	],
 	"dependencies": {
-		"streamlet": "*",
-		"davy": "*"
+		"streamlet": "*"
 	}
 }
