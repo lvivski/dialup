@@ -14,14 +14,17 @@ function Dialup(url, room) {
 	/** @type string[] */
 	const clientIds = []
 
-	/** @type Object.<string,RTCPeerConnection> */
-	const connections = {}
-
-	/** @type Object.<string,RTCDataChannel> */
-	const data = {}
-
 	/** @type MediaStream[] */
 	const streams = []
+
+	/** @type Object.<string,RTCPeerConnection> */
+	const peerConnections = {}
+
+	/** @type Object.<string,RTCDataChannel> */
+	const dataChannels = {}
+
+	/** @type Object.<string,RTCRtpSender[]> */
+	const senders = {}
 
 	const controller = Streamlet.control()
 	const stream = controller.stream
@@ -33,7 +36,7 @@ function Dialup(url, room) {
 	this.onLeave = channel.onLeave
 
 	this.broadcast = function (message) {
-		for (const clientId in data) {
+		for (const clientId in dataChannels) {
 			this.send(clientId, message)
 		}
 	}
@@ -43,7 +46,7 @@ function Dialup(url, room) {
 	 * @param {any} message
 	 */
 	this.send = function (clientId, message) {
-		const dc = data[clientId]
+		const dc = dataChannels[clientId]
 		if (dc.readyState === 'open') {
 			dc.send(message)
 		}
@@ -54,80 +57,108 @@ function Dialup(url, room) {
 	 * @param {boolean} video
 	 * @returns Promise<MediaStream>
 	 */
-	this.createStream = function (audio, video) {
+	this.getUserStream = function (audio, video) {
 		return navigator.mediaDevices.getUserMedia({
 			audio: audio,
-			video: video
+			video: video ? { facingMode: 'user' } : false
 		}).then(function (stream) {
-
 			Overtone.filter(stream)
 
 			streams.push(stream)
 
-			for (const id of clientIds) {
-				const connection = connections[id] = createPeerConnection(id)
-
-				for (const stream of streams) {
-					stream.getTracks().forEach(function (track) {
-						connection.addTrack(track, stream)
-					})
-				}
-
-				createDataChannel(id, connection)
-				createOffer(id, connection)
+			for (const clientId of clientIds) {
+				const pc = peerConnections[clientId]
+				addTracks(clientId, pc, stream)
 			}
 
 			return stream
 		})
 	}
 
+	this.getDisplayStream = function () {
+		return navigator.mediaDevices.getDisplayMedia()
+			.then(function (stream) {
+				streams.push(stream)
+
+				for (const clientId of clientIds) {
+					const pc = peerConnections[clientId]
+					addTracks(clientId, pc, stream)
+				}
+
+				return stream
+			})
+	}
+
+	this.stopStream = function (stream) {
+		stream.getTracks().forEach(function (track) {
+			track.stop()
+		})
+	}
+
 	channel.onPeers.listen(function (message) {
 		me = message.you
 
-		for (const id of message.connections) {
-			clientIds.push(id)
+		for (const clientId of message.connections) {
+			clientIds.push(clientId)
+
+			createPeerConnection(clientId)
+		}
+	})
+
+	channel.onNew.listen(function (message) {
+		const clientId = message.id
+		clientIds.push(clientId)
+
+		const pc = createPeerConnection(clientId)
+		createDataChannel(clientId, pc)
+
+		for (const stream of streams) {
+			addTracks(clientId, pc, stream)
 		}
 	})
 
 	channel.onCandidate.listen(function (message) {
 		const clientId = message.id
 
-		connections[clientId].addIceCandidate(message.candidate)
-	})
-
-	channel.onNew.listen(function (message) {
-		const clientId = message.id
-		const pc = createPeerConnection(clientId)
-
-		clientIds.push(clientId)
-		connections[clientId] = pc
-
-		streams.forEach(function (stream) {
-			stream.getTracks().forEach(function (track) {
-				pc.addTrack(track, stream)
-			})
-		})
+		peerConnections[clientId].addIceCandidate(message.candidate)
 	})
 
 	channel.onLeave.listen(function (message) {
 		const clientId = message.id
-		delete connections[clientId]
-		delete data[clientId]
+
+		delete peerConnections[clientId]
+		delete dataChannels[clientId]
+		delete senders[clientId]
 		clientIds.splice(clientIds.indexOf(clientId), 1)
 	})
 
 	channel.onOffer.listen(function (message) {
 		const clientId = message.id
-		const pc = connections[clientId]
+		const pc = peerConnections[clientId]
 		pc.setRemoteDescription(message.description)
 		createAnswer(clientId, pc)
 	})
 
 	channel.onAnswer.listen(function (message) {
 		const clientId = message.id
-		const pc = connections[clientId]
+		const pc = peerConnections[clientId]
 		pc.setRemoteDescription(message.description)
 	})
+
+	/**
+	 * @param {string} clientId
+	 * @param {RTCPeerConnection} pc
+	 * @param {MediaStream} stream
+	 */
+	function addTracks(clientId, pc, stream) {
+		if (!senders[clientId]) {
+			senders[clientId] = []
+		}
+
+		stream.getTracks().forEach(function (track) {
+			senders[clientId].push(pc.addTrack(track, stream))
+		})
+	}
 
 	/**
 	 * @param {string} clientId
@@ -190,7 +221,7 @@ function Dialup(url, room) {
 
 		dc.onclose = function () {}
 
-		data[clientId] = dc
+		dataChannels[clientId] = dc
 	}
 
 	/**
@@ -199,6 +230,7 @@ function Dialup(url, room) {
 	 */
 	function createPeerConnection(clientId) {
 		const pc = new RTCPeerConnection(configuration)
+		peerConnections[clientId] = pc
 
 		pc.onicecandidate = function (e) {
 			if (e.candidate && e.candidate.candidate) {
@@ -223,6 +255,10 @@ function Dialup(url, room) {
 
 		pc.onicecandidateerror = function (e) {
 			console.log(e)
+		}
+
+		pc.onnegotiationneeded = function (e) {
+			createOffer(clientId, pc)
 		}
 
 		pc.ontrack = function (e) {

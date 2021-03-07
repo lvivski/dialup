@@ -16,8 +16,8 @@ var serversList = [
 ]
 
 var iceServers = serversList.reduce(function (servers, server) {
-	var lastEntry = servers[servers.length - 1]
 	server = 'stun:' + server
+	var lastEntry = servers[servers.length - 1]
 	if (lastEntry) {
 		var lastServer = lastEntry.urls[0]
 		if (trimIce(lastServer) === trimIce(server)) {
