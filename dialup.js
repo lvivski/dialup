@@ -19,7 +19,7 @@
     Streamlet = global.Streamlet;
     Overtone = global.Overtone;
   }
-  var serversList = [ "stun.l.google.com:19302", "stun1.l.google.com:19302", "stun2.l.google.com:19302", "stun3.l.google.com:19302", "stun4.l.google.com:19302", "stun.ekiga.net", "stun.ideasip.com", "stun.rixtelecom.se", "stun.schlund.de", "stun.stunprotocol.org:3478", "stun.voiparound.com", "stun.voipbuster.com", "stun.voipstunt.com", "stun.voxgratia.org" ];
+  var serversList = [ "stun.l.google.com:19302" ];
   var iceServers = serversList.reduce(function(servers, server) {
     server = "stun:" + server;
     var lastEntry = servers[servers.length - 1];
@@ -68,10 +68,6 @@
     this.onCandidate = stream.filter(message => message.type === "candidate");
     this.onLeave = stream.filter(message => message.type === "leave");
   }
-  const constraints = {
-    offerToReceiveAudio: true,
-    offerToReceiveVideo: true
-  };
   const configuration = {
     iceServers: iceServers
   };
@@ -82,7 +78,6 @@
     const streams = [];
     const peerConnections = {};
     const dataChannels = {};
-    const senders = {};
     const controller = Streamlet.control();
     const stream = controller.stream;
     this.onAdd = stream.filter(message => message.type === "add");
@@ -100,97 +95,98 @@
         dc.send(message);
       }
     };
-    this.getUserStream = function(audio, video) {
-      return navigator.mediaDevices.getUserMedia({
+    this.getUserStream = async function(audio, video) {
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: audio,
         video: video ? {
           facingMode: "user"
         } : false
-      }).then(function(stream) {
-        Overtone.filter(stream);
-        streams.push(stream);
-        for (const clientId of clientIds) {
-          const pc = peerConnections[clientId];
-          addTracks(clientId, pc, stream);
-        }
-        return stream;
       });
+      streams.push(stream);
+      Overtone.filter(stream);
+      for (const clientId of clientIds) {
+        addTracks(clientId, stream);
+      }
+      return stream;
     };
-    this.getDisplayStream = function() {
-      return navigator.mediaDevices.getDisplayMedia().then(function(stream) {
-        streams.push(stream);
-        for (const clientId of clientIds) {
-          const pc = peerConnections[clientId];
-          addTracks(clientId, pc, stream);
-        }
-        return stream;
-      });
+    this.getDisplayStream = async function() {
+      const stream = await navigator.mediaDevices.getDisplayMedia();
+      streams.push(stream);
+      for (const clientId of clientIds) {
+        addTracks(clientId, stream);
+      }
+      return stream;
     };
     this.stopStream = function(stream) {
-      stream.getTracks().forEach(function(track) {
+      for (const track of stream.getTracks()) {
         track.stop();
-      });
+      }
     };
     channel.onPeers.listen(function(message) {
       me = message.you;
       for (const clientId of message.connections) {
         clientIds.push(clientId);
         createPeerConnection(clientId);
+        createDataChannel(clientId);
       }
     });
     channel.onNew.listen(function(message) {
       const clientId = message.id;
       clientIds.push(clientId);
-      const pc = createPeerConnection(clientId);
-      createDataChannel(clientId, pc);
-      for (const stream of streams) {
-        addTracks(clientId, pc, stream);
-      }
+      createPeerConnection(clientId);
     });
     channel.onCandidate.listen(function(message) {
       const clientId = message.id;
-      peerConnections[clientId].addIceCandidate(message.candidate);
+      const pc = peerConnections[clientId];
+      pc.addIceCandidate(message.candidate);
     });
     channel.onLeave.listen(function(message) {
       const clientId = message.id;
       delete peerConnections[clientId];
       delete dataChannels[clientId];
-      delete senders[clientId];
       clientIds.splice(clientIds.indexOf(clientId), 1);
     });
-    channel.onOffer.listen(function(message) {
+    channel.onOffer.listen(async function(message) {
       const clientId = message.id;
       const pc = peerConnections[clientId];
-      pc.setRemoteDescription(message.description);
-      createAnswer(clientId, pc);
-    });
-    channel.onAnswer.listen(function(message) {
-      const clientId = message.id;
-      const pc = peerConnections[clientId];
-      pc.setRemoteDescription(message.description);
-    });
-    function addTracks(clientId, pc, stream) {
-      if (!senders[clientId]) {
-        senders[clientId] = [];
+      await pc.setRemoteDescription(message.description);
+      if (pc.iceConnectionState === "new") {
+        for (const stream of streams) {
+          addTracks(clientId, stream);
+        }
       }
-      stream.getTracks().forEach(function(track) {
-        senders[clientId].push(pc.addTrack(track, stream));
+      await createAnswer(clientId);
+    });
+    channel.onAnswer.listen(async function(message) {
+      const clientId = message.id;
+      const pc = peerConnections[clientId];
+      await pc.setRemoteDescription(message.description);
+    });
+    function addTracks(clientId, stream) {
+      const pc = peerConnections[clientId];
+      for (const track of stream.getTracks()) {
+        pc.addTrack(track, stream);
+      }
+    }
+    async function createOffer(clientId) {
+      const pc = peerConnections[clientId];
+      await pc.setLocalDescription(await pc.createOffer());
+      channel.send("offer", {
+        id: clientId,
+        description: pc.localDescription
       });
     }
-    function createOffer(clientId, pc) {
-      pc.createOffer(constraints).then(offer => pc.setLocalDescription(offer)).then(() => channel.send("offer", {
+    async function createAnswer(clientId) {
+      const pc = peerConnections[clientId];
+      await pc.setLocalDescription(await pc.createAnswer());
+      channel.send("answer", {
         id: clientId,
         description: pc.localDescription
-      }), function() {});
+      });
     }
-    function createAnswer(clientId, pc) {
-      pc.createAnswer().then(answer => pc.setLocalDescription(answer)).then(() => channel.send("answer", {
-        id: clientId,
-        description: pc.localDescription
-      }), function() {});
-    }
-    function createDataChannel(clientId, pc, label) {
+    function createDataChannel(clientId, label) {
       label || (label = "dataChannel");
+      const pc = peerConnections[clientId];
       const dc = pc.createDataChannel(label);
       addDataChannel(clientId, dc);
     }
@@ -220,6 +216,8 @@
       pc.oniceconnectionstatechange = function() {
         switch (pc.iceConnectionState) {
          case "disconnected":
+          break;
+
          case "failed":
           pc.close();
           break;
@@ -232,8 +230,8 @@
       pc.onicecandidateerror = function(e) {
         console.log(e);
       };
-      pc.onnegotiationneeded = function(e) {
-        createOffer(clientId, pc);
+      pc.onnegotiationneeded = function() {
+        createOffer(clientId);
       };
       pc.ontrack = function(e) {
         controller.add({

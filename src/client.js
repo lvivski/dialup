@@ -1,8 +1,3 @@
-const constraints = {
-	offerToReceiveAudio: true,
-	offerToReceiveVideo: true
-}
-
 const configuration = {
 	iceServers: iceServers
 }
@@ -54,42 +49,39 @@ function Dialup(url, room) {
 	 * @param {boolean} video
 	 * @returns Promise<MediaStream>
 	 */
-	this.getUserStream = function (audio, video) {
-		return navigator.mediaDevices.getUserMedia({
+	this.getUserStream = async function (audio, video) {
+		const stream = await navigator.mediaDevices.getUserMedia({
 			audio: audio,
 			video: video ? { facingMode: 'user' } : false
-		}).then(function (stream) {
-			Overtone.filter(stream)
-
-			streams.push(stream)
-
-			for (const clientId of clientIds) {
-				const pc = peerConnections[clientId]
-				addTracks(pc, stream)
-			}
-
-			return stream
 		})
+
+		streams.push(stream)
+
+		Overtone.filter(stream)
+
+		for (const clientId of clientIds) {
+			addTracks(clientId, stream)
+		}
+
+		return stream
 	}
 
-	this.getDisplayStream = function () {
-		return navigator.mediaDevices.getDisplayMedia()
-			.then(function (stream) {
-				streams.push(stream)
+	this.getDisplayStream = async function () {
+		const stream = await navigator.mediaDevices.getDisplayMedia()
 
-				for (const clientId of clientIds) {
-					const pc = peerConnections[clientId]
-					addTracks(pc, stream)
-				}
+		streams.push(stream)
 
-				return stream
-			})
+		for (const clientId of clientIds) {
+			addTracks(clientId, stream)
+		}
+
+		return stream
 	}
 
 	this.stopStream = function (stream) {
-		stream.getTracks().forEach(function (track) {
+		for (const track of stream.getTracks()) {
 			track.stop()
-		})
+		}
 	}
 
 	channel.onPeers.listen(function (message) {
@@ -98,8 +90,8 @@ function Dialup(url, room) {
 		for (const clientId of message.connections) {
 			clientIds.push(clientId)
 
-			const pc = createPeerConnection(clientId)
-			createDataChannel(clientId, pc)
+			createPeerConnection(clientId)
+			createDataChannel(clientId)
 		}
 	})
 
@@ -107,18 +99,14 @@ function Dialup(url, room) {
 		const clientId = message.id
 		clientIds.push(clientId)
 
-		const pc = createPeerConnection(clientId)
-		createDataChannel(clientId, pc)
-
-		for (const stream of streams) {
-			addTracks(pc, stream)
-		}
+		createPeerConnection(clientId)
 	})
 
 	channel.onCandidate.listen(function (message) {
 		const clientId = message.id
+		const pc = peerConnections[clientId]
 
-		peerConnections[clientId].addIceCandidate(message.candidate)
+		pc.addIceCandidate(message.candidate)
 	})
 
 	channel.onLeave.listen(function (message) {
@@ -129,70 +117,77 @@ function Dialup(url, room) {
 		clientIds.splice(clientIds.indexOf(clientId), 1)
 	})
 
-	channel.onOffer.listen(function (message) {
+	channel.onOffer.listen(async function (message) {
 		const clientId = message.id
 		const pc = peerConnections[clientId]
-		pc.setRemoteDescription(message.description)
-			.then(() => createAnswer(clientId, pc))
+
+		await pc.setRemoteDescription(message.description)
+
+		if (pc.iceConnectionState === 'new') {
+			for (const stream of streams) {
+				addTracks(clientId, stream)
+			}
+		}
+
+		await createAnswer(clientId)
 	})
 
-	channel.onAnswer.listen(function (message) {
+	channel.onAnswer.listen(async function (message) {
 		const clientId = message.id
 		const pc = peerConnections[clientId]
-		pc.setRemoteDescription(message.description)
+
+		await pc.setRemoteDescription(message.description)
 	})
 
 	/**
-	 * @param {RTCPeerConnection} pc
+	 * @param {string} clientId
 	 * @param {MediaStream} stream
 	 */
-	function addTracks(pc, stream) {
-		stream.getTracks().forEach(function (track) {
+	function addTracks(clientId, stream) {
+		const pc = peerConnections[clientId]
+		for (const track of stream.getTracks()) {
 			pc.addTrack(track, stream)
+		}
+	}
+
+	/**
+	 * @param {string} clientId
+	 */
+	async function createOffer(clientId) {
+		const pc = peerConnections[clientId]
+
+		await pc.setLocalDescription(await pc.createOffer())
+
+		channel.send('offer', {
+			id: clientId,
+			description: pc.localDescription
 		})
 	}
 
 	/**
 	 * @param {string} clientId
-	 * @param {RTCPeerConnection} pc
 	 */
-	function createOffer(clientId, pc) {
-		pc.createOffer(constraints)
-			.then(offer => pc.setLocalDescription(offer))
-			.then(() =>
-				channel.send('offer', {
-					id: clientId,
-					description: pc.localDescription
-				}),
-				function () {}
-			)
+	async function createAnswer(clientId) {
+		const pc = peerConnections[clientId]
+
+		await pc.setLocalDescription(await pc.createAnswer())
+
+		channel.send('answer', {
+			id: clientId,
+			description: pc.localDescription
+		})
 	}
 
 	/**
 	 * @param {string} clientId
-	 * @param {RTCPeerConnection} pc
-	 */
-	function createAnswer(clientId, pc) {
-		pc.createAnswer()
-			.then(answer => pc.setLocalDescription(answer))
-			.then(() =>
-				channel.send('answer', {
-					id: clientId,
-					description: pc.localDescription
-				}),
-				function () {}
-			)
-	}
-
-	/**
-	 * @param {string} clientId
-	 * @param {RTCPeerConnection} pc
 	 * @param {string} [label]
 	 */
-	function createDataChannel(clientId, pc, label) {
+	function createDataChannel(clientId, label) {
 		label || (label = 'dataChannel')
 
+		const pc = peerConnections[clientId]
 		const dc = pc.createDataChannel(label)
+
 		addDataChannel(clientId, dc)
 	}
 
@@ -236,6 +231,7 @@ function Dialup(url, room) {
 		pc.oniceconnectionstatechange = function() {
 			switch (pc.iceConnectionState) {
 				case 'disconnected':
+					break
 				case 'failed':
 					pc.close()
 					break
@@ -249,8 +245,9 @@ function Dialup(url, room) {
 			console.log(e)
 		}
 
+		// very unreliable
 		pc.onnegotiationneeded = function () {
-			createOffer(clientId, pc)
+			createOffer(clientId)
 		}
 
 		pc.ontrack = function (e) {
