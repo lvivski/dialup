@@ -23,9 +23,6 @@ function Dialup(url, room) {
 	/** @type Object.<string,RTCDataChannel> */
 	const dataChannels = {}
 
-	/** @type Object.<string,RTCRtpSender[]> */
-	const senders = {}
-
 	const controller = Streamlet.control()
 	const stream = controller.stream
 
@@ -68,7 +65,7 @@ function Dialup(url, room) {
 
 			for (const clientId of clientIds) {
 				const pc = peerConnections[clientId]
-				addTracks(clientId, pc, stream)
+				addTracks(pc, stream)
 			}
 
 			return stream
@@ -82,7 +79,7 @@ function Dialup(url, room) {
 
 				for (const clientId of clientIds) {
 					const pc = peerConnections[clientId]
-					addTracks(clientId, pc, stream)
+					addTracks(pc, stream)
 				}
 
 				return stream
@@ -101,7 +98,8 @@ function Dialup(url, room) {
 		for (const clientId of message.connections) {
 			clientIds.push(clientId)
 
-			createPeerConnection(clientId)
+			const pc = createPeerConnection(clientId)
+			createDataChannel(clientId, pc)
 		}
 	})
 
@@ -113,7 +111,7 @@ function Dialup(url, room) {
 		createDataChannel(clientId, pc)
 
 		for (const stream of streams) {
-			addTracks(clientId, pc, stream)
+			addTracks(pc, stream)
 		}
 	})
 
@@ -128,7 +126,6 @@ function Dialup(url, room) {
 
 		delete peerConnections[clientId]
 		delete dataChannels[clientId]
-		delete senders[clientId]
 		clientIds.splice(clientIds.indexOf(clientId), 1)
 	})
 
@@ -136,7 +133,7 @@ function Dialup(url, room) {
 		const clientId = message.id
 		const pc = peerConnections[clientId]
 		pc.setRemoteDescription(message.description)
-		createAnswer(clientId, pc)
+			.then(() => createAnswer(clientId, pc))
 	})
 
 	channel.onAnswer.listen(function (message) {
@@ -146,17 +143,12 @@ function Dialup(url, room) {
 	})
 
 	/**
-	 * @param {string} clientId
 	 * @param {RTCPeerConnection} pc
 	 * @param {MediaStream} stream
 	 */
-	function addTracks(clientId, pc, stream) {
-		if (!senders[clientId]) {
-			senders[clientId] = []
-		}
-
+	function addTracks(pc, stream) {
 		stream.getTracks().forEach(function (track) {
-			senders[clientId].push(pc.addTrack(track, stream))
+			pc.addTrack(track, stream)
 		})
 	}
 
@@ -257,7 +249,7 @@ function Dialup(url, room) {
 			console.log(e)
 		}
 
-		pc.onnegotiationneeded = function (e) {
+		pc.onnegotiationneeded = function () {
 			createOffer(clientId, pc)
 		}
 
