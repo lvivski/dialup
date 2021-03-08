@@ -4,9 +4,9 @@ const serversList = [
 
 export default serversList.reduce(function (servers, server) {
 	server = 'stun:' + server
-	var lastEntry = servers[servers.length - 1]
+	const lastEntry = servers[servers.length - 1]
 	if (lastEntry) {
-		var lastServer = lastEntry.urls[0]
+		const lastServer = lastEntry.urls[0]
 		if (trimIce(lastServer) === trimIce(server)) {
 			lastEntry.urls.push(server)
 		} else {
