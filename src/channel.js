@@ -1,3 +1,5 @@
+import Streamlet from 'streamlet'
+
 export default function Channel(url, room) {
 	const controller = Streamlet.control()
 	const stream = controller.stream
