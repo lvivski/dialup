@@ -11,11 +11,5 @@
     "streamlet": "*",
     "ws": "*"
   },
-  "scripts": {
-    "prepublish": "make -B"
-  },
-  "devDependencies": {
-    "uglify-js": "*"
-  },
   "license": "MIT"
 }

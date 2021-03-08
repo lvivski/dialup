@@ -1,4 +1,4 @@
-function Channel(url, room) {
+export default function Channel(url, room) {
 	const controller = Streamlet.control()
 	const stream = controller.stream
 	const ws = new WebSocket(url)
