@@ -82,6 +82,7 @@ function Dialup(url, room) {
 		for (const track of stream.getTracks()) {
 			track.stop()
 		}
+		streams.splice(streams.indexOf(stream), 1)
 	}
 
 	channel.onPeers.listen(function (message) {
