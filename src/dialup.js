@@ -250,7 +250,7 @@ export default function Dialup(url, room) {
 	 * @param {MediaStream} stream
 	 */
 	 function stopTracks(stream) {
-		streams.splice(stream.indexOf(stream), 1)
+		streams.splice(streams.indexOf(stream), 1)
 
 		for (const track of stream.getTracks()) {
 			track.stop()
