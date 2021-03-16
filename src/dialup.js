@@ -1,5 +1,6 @@
-import Streamlet from 'streamlet'
 import Overtone from 'overtone'
+import Chromatone from 'chromatone'
+import EventEmitter from './eventemitter.js'
 import iceServers from './ice.js'
 import Channel from './channel.js'
 
@@ -9,7 +10,6 @@ const configuration = {
 
 export default function Dialup(url, room) {
 	let me = null
-	const channel = new Channel(url, room)
 
 	/** @type string[] */
 	const clientIds = []
@@ -23,54 +23,51 @@ export default function Dialup(url, room) {
 	/** @type Object.<string,RTCDataChannel> */
 	const dataChannels = {}
 
-	const controller = Streamlet.control()
-	const stream = controller.stream
+	/** @type Object.<string,MediaStream[]> */
 
-	this.onAdd = stream.filter(message => message.type === 'add')
-	this.onData = stream.filter(message => message.type === 'data')
-	this.onPeers = channel.onPeers
-	this.onLeave = channel.onLeave
-
-	this.broadcast = function (message) {
-		for (const clientId in dataChannels) {
-			this.send(clientId, message)
-		}
-	}
+	const target = new EventEmitter()
 
 	/**
-	 * @param {string} clientId
-	 * @param {any} message
-	 */
-	this.send = function (clientId, message) {
-		const dc = dataChannels[clientId]
-		if (dc.readyState === 'open') {
-			dc.send(message)
-		}
-	}
-
-	/**
-	 * @param {boolean} audio
-	 * @param {boolean} video
+	 * @param {boolean | string} audio
+	 * @param {boolean | string} video
 	 * @returns Promise<MediaStream>
 	 */
-	this.getUserStream = async function (audio, video) {
+	target.getUserStream = async function (audio, video) {
 		const stream = await navigator.mediaDevices.getUserMedia({
-			audio: audio,
-			video: video ? { facingMode: 'user' } : false
+			audio: typeof audio === 'string'
+				? { deviceId: audio }
+				: audio,
+
+			video: typeof video === 'string'
+				? { deviceId: video }
+				: video
+					? { facingMode: 'user' }
+					: false
 		})
 
-		streams.push(stream)
+		const replace = Boolean(streams[0])
+
+		if (replace) {
+			stopTracks(streams[0])
+		} else {
+			streams.unshift(stream)
+		}
 
 		Overtone.filter(stream)
+		Chromatone.filter(stream)
 
 		for (const clientId of clientIds) {
-			addTracks(clientId, stream)
+			if (replace) {
+				replaceTracks(clientId, stream)
+			} else {
+				addTracks(clientId, stream)
+			}
 		}
 
 		return stream
 	}
 
-	this.getDisplayStream = async function () {
+	target.getDisplayStream = async function () {
 		const stream = await navigator.mediaDevices.getDisplayMedia()
 
 		streams.push(stream)
@@ -79,54 +76,115 @@ export default function Dialup(url, room) {
 			addTracks(clientId, stream)
 		}
 
+		const video = stream.getVideoTracks()[0]
+
+		video.onended = function () {
+			target.removeStream(stream)
+		}
+
 		return stream
 	}
 
-	this.stopStream = function (stream) {
-		for (const track of stream.getTracks()) {
-			track.stop()
+	target.getMediaDevices = async function () {
+		const mediaDevices = await navigator.mediaDevices.enumerateDevices()
+		const devices = {
+			video: [],
+			audio: []
 		}
-		streams.splice(streams.indexOf(stream), 1)
+
+		for (const device of mediaDevices) {
+			if (device.kind === 'videoinput') {
+				devices.video.push({
+					id: device.deviceId,
+					label:  device.label || `Camera ${devices.video.length +1}`
+				})
+			} else {
+				devices.audio.push({
+					id: device.deviceId,
+					label: device.label || `Mic ${devices.audio.length +1}`
+				})
+			}
+		}
+
+		return devices
 	}
 
-	channel.onPeers.listen(function (message) {
-		me = message.you
+	target.removeStream = function (stream) {
+		stopTracks(stream)
 
-		for (const clientId of message.connections) {
+		for (const clientId of clientIds) {
+			removeTracks(clientId, stream)
+		}
+
+		return stream
+	}
+
+	/**
+	 * @param {string} clientId
+	 * @param {any} message
+	 */
+	 target.send = function (clientId, message) {
+		const dc = dataChannels[clientId]
+		if (dc.readyState === 'open') {
+			dc.send(message)
+		}
+	}
+
+	/**
+	 * @param {string} message
+	 */
+	target.broadcast = function (message) {
+		for (const clientId in dataChannels) {
+			target.send(clientId, message)
+		}
+	}
+
+	const channel = new Channel(url, room)
+
+	channel.onpeers = function (e) {
+		me = e.data.you
+
+		for (const clientId of e.data.connections) {
 			clientIds.push(clientId)
 
 			createPeerConnection(clientId)
 			createDataChannel(clientId)
 		}
-	})
 
-	channel.onNew.listen(function (message) {
-		const clientId = message.id
+		target.dispatchEvent(e)
+	}
+
+	channel.onnew = function (e) {
+		const clientId = e.data.id
+
 		clientIds.push(clientId)
-
 		createPeerConnection(clientId)
-	})
 
-	channel.onCandidate.listen(function (message) {
-		const clientId = message.id
+		target.dispatchEvent(e)
+	}
+
+	channel.oncandidate = function (e) {
+		const clientId = e.data.id
+
 		const pc = peerConnections[clientId]
+		pc.addIceCandidate(e.data.candidate)
+	}
 
-		pc.addIceCandidate(message.candidate)
-	})
-
-	channel.onLeave.listen(function (message) {
-		const clientId = message.id
+	channel.onleave = function (e) {
+		const clientId = e.data.id
 
 		delete peerConnections[clientId]
 		delete dataChannels[clientId]
 		clientIds.splice(clientIds.indexOf(clientId), 1)
-	})
 
-	channel.onOffer.listen(async function (message) {
-		const clientId = message.id
+		target.dispatchEvent(e)
+	}
+
+	channel.onoffer = async function (e) {
+		const clientId = e.data.id
+
 		const pc = peerConnections[clientId]
-
-		await pc.setRemoteDescription(message.description)
+		await pc.setRemoteDescription(e.data.description)
 
 		if (pc.iceConnectionState === 'new') {
 			for (const stream of streams) {
@@ -135,14 +193,14 @@ export default function Dialup(url, room) {
 		}
 
 		await createAnswer(clientId)
-	})
+	}
 
-	channel.onAnswer.listen(async function (message) {
-		const clientId = message.id
+	channel.onanswer = async function (e) {
+		const clientId = e.data.id
+
 		const pc = peerConnections[clientId]
-
-		await pc.setRemoteDescription(message.description)
-	})
+		await pc.setRemoteDescription(e.data.description)
+	}
 
 	/**
 	 * @param {string} clientId
@@ -150,8 +208,52 @@ export default function Dialup(url, room) {
 	 */
 	function addTracks(clientId, stream) {
 		const pc = peerConnections[clientId]
+
 		for (const track of stream.getTracks()) {
 			pc.addTrack(track, stream)
+		}
+	}
+
+	/**
+	 * @param {string} clientId
+	 * @param {MediaStream} stream
+	 */
+	 function removeTracks(clientId, stream) {
+		const pc = peerConnections[clientId]
+		const senders = pc.getSenders()
+
+		for (const track of stream.getTracks()) {
+			const sender = senders.find(sender => sender.track === track)
+			if (sender) {
+				pc.removeTrack(sender)
+			}
+		}
+	}
+
+	/**
+	 * @param {string} clientId
+	 * @param {MediaStream} stream
+	 */
+	 function replaceTracks(clientId, stream) {
+		const pc = peerConnections[clientId]
+		const senders = pc.getSenders()
+
+		for (const track of stream.getTracks()) {
+			const sender = senders.find(sender => sender.track.kind === track.kind)
+			if (sender) {
+				sender.replaceTrack(track)
+			}
+		}
+	}
+
+	/**
+	 * @param {MediaStream} stream
+	 */
+	 function stopTracks(stream) {
+		streams.splice(stream.indexOf(stream), 1)
+
+		for (const track of stream.getTracks()) {
+			track.stop()
 		}
 	}
 
@@ -187,9 +289,7 @@ export default function Dialup(url, room) {
 	 * @param {string} clientId
 	 * @param {string} [label]
 	 */
-	function createDataChannel(clientId, label) {
-		label || (label = 'dataChannel')
-
+	function createDataChannel(clientId, label = 'dataChannel') {
 		const pc = peerConnections[clientId]
 		const dc = pc.createDataChannel(label)
 
@@ -203,12 +303,13 @@ export default function Dialup(url, room) {
 	function addDataChannel(clientId, dc) {
 		dc.onopen = function () {}
 
-		dc.onmessage = function (e) {
-			controller.add({
-				id: clientId,
-				type: 'data',
-				data: e.data
-			})
+		dc.onmessage = function ({data}) {
+			target.dispatchEvent(new MessageEvent('data', {
+				data: {
+					id: clientId,
+					data
+				}
+			}))
 		}
 
 		dc.onclose = function () {}
@@ -233,12 +334,13 @@ export default function Dialup(url, room) {
 			}
 		}
 
-		pc.oniceconnectionstatechange = function() {
+		pc.oniceconnectionstatechange = function () {
 			switch (pc.iceConnectionState) {
-				case 'disconnected':
-					break
 				case 'failed':
+				case 'closed':
 					pc.close()
+					break
+				case 'disconnected':
 					break
 				case 'completed':
 					pc.onicecandidate = function () {}
@@ -256,11 +358,12 @@ export default function Dialup(url, room) {
 		}
 
 		pc.ontrack = function (e) {
-			controller.add({
-				id: clientId,
-				type: 'add',
-				stream: e.streams[0]
-			})
+			target.dispatchEvent(new MessageEvent('add', {
+				data: {
+					id: clientId,
+					stream: e.streams[0]
+				}
+			}))
 		}
 
 		pc.ondatachannel = function (e) {
@@ -269,4 +372,6 @@ export default function Dialup(url, room) {
 
 		return pc
 	}
+
+	return target
 }

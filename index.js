@@ -1,1 +1,1 @@
-module.exports = require('./src/server')
+export { default } from './src/server.js'

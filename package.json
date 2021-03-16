@@ -3,12 +3,13 @@
   "version": "0.2.0",
   "author": "Yehor Lvivski <yehor@lvivski.com>",
   "description": "WebRTC client/server library",
+  "type": "module",
   "keywords": [
     "webrtc"
   ],
   "dependencies": {
+    "chromatone": "*",
     "overtone": "*",
-    "streamlet": "*",
     "ws": "*"
   },
   "license": "MIT"

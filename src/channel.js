@@ -1,33 +1,26 @@
-import Streamlet from 'streamlet'
+import EventEmitter from './eventemitter.js'
 
-export default function Channel(url, room) {
-	const controller = Streamlet.control()
-	const stream = controller.stream
+export default function Channel(url, room = '') {
+	const target = new EventEmitter()
 	const ws = new WebSocket(url)
 
 	ws.onopen = function () {
-		send('join', {
-			room: room || ''
-		})
+		target.send('join', { room })
 	}
 
-	ws.onerror = function () {}
-
-	ws.onmessage = function (e) {
-		controller.add(JSON.parse(e.data))
+	ws.onmessage = function ({data}) {
+		const message = JSON.parse(data)
+		const eventType = message.type
+		delete message.type
+		target.dispatchEvent(new MessageEvent(eventType, {
+			data: message
+		}))
 	}
 
-	function send(message, data) {
+	target.send = function (message, data) {
 		data.type = message
 		ws.send(JSON.stringify(data))
 	}
-	this.send = send
 
-	this.onJoin = stream.filter(message => message.type === 'join')
-	this.onOffer = stream.filter(message => message.type === 'offer')
-	this.onAnswer = stream.filter(message => message.type === 'answer')
-	this.onPeers = stream.filter(message => message.type === 'peers')
-	this.onNew = stream.filter(message => message.type === 'new')
-	this.onCandidate = stream.filter(message => message.type === 'candidate')
-	this.onLeave = stream.filter(message => message.type === 'leave')
+	return target
 }
