@@ -1,16 +1,22 @@
 {
   "name": "dialup",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "author": "Yehor Lvivski <yehor@lvivski.com>",
   "description": "WebRTC client/server library",
   "type": "module",
+  "module": "index.js",
+  "browser": {
+    "./index.js": "./lib/index.js"
+  },
   "keywords": [
     "webrtc"
   ],
   "dependencies": {
-    "chromatone": "*",
-    "overtone": "*",
     "ws": "*"
   },
+	"scripts": {
+		"build": "tsc --project tsconfig.json",
+    "prepare": "npm run build"
+	},
   "license": "MIT"
 }

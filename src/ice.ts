@@ -2,7 +2,11 @@ const serversList = [
 	'stun.l.google.com:19302',
 ]
 
-export default serversList.reduce(function (servers, server) {
+type Server = {
+	urls: string[]
+}
+
+export default serversList.reduce(function (servers: Server[], server: string) {
 	server = 'stun:' + server
 	const lastEntry = servers[servers.length - 1]
 	if (lastEntry) {
@@ -10,15 +14,15 @@ export default serversList.reduce(function (servers, server) {
 		if (trimIce(lastServer) === trimIce(server)) {
 			lastEntry.urls.push(server)
 		} else {
-			servers.push({urls: [server]})
+			servers.push({ urls: [server] })
 		}
 	} else {
-		servers.push({urls: [server]})
+		servers.push({ urls: [server] })
 	}
 
 	return servers
 }, [])
 
-function trimIce(server) {
+function trimIce(server: string) {
 	return server.replace(/^stun:stun\d*\./, '').replace(/:\d+$/, '')
 }
