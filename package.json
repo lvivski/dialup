@@ -19,9 +19,5 @@
     "build": "tsc --project tsconfig.json",
     "prepare": "npm run build"
   },
-  "engines": {
-    "node": "16.x",
-    "npm": "8.x"
-  },
   "license": "MIT"
 }
