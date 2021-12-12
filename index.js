@@ -1,10 +1,9 @@
-import ws from 'ws'
-const { Server } = ws
+import { WebSocketServer } from 'ws'
 
 export default function Dialup(options) {
 	const sockets = {}
 	const rooms = {}
-	const wss = new Server(options)
+	const wss = new WebSocketServer(options)
 
 	wss.on('connection', function (socket) {
 		socket.clientId = Math.random().toString(36).slice(2)
