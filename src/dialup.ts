@@ -16,7 +16,7 @@ type PeerConnections = {
 	[key: string]: RTCPeerConnection
 }
 
-type DialupEventType = 'peers' | 'new' | 'candidate' | 'leave' | 'offer' | 'answer'
+type DialupEventType = 'peers' | 'new' | 'candidate' | 'leave' | 'offer' | 'answer' | 'add' | 'data'
 
 interface DialupEvent extends MessageEvent {
 	type: DialupEventType
@@ -169,7 +169,7 @@ class Dialup extends EventTarget {
 				break
 			case 'new':
 				this.#clientIds.push(clientId)
-				this.#peerConnections[clientId] = createPeerConnection(clientId, this.#socket, this)
+				this.#peerConnections[clientId] = createPeerConnection(clientId, this.#socket, this, this.#dataChannels)
 
 				this.dispatchEvent(e)
 				break

@@ -82,7 +82,7 @@ export function addDataChannel(clientId: string, dc: RTCDataChannel, emitter: Ev
 	return dc
 }
 
-export function createPeerConnection(clientId: string, socket: WebSocket, emitter: EventTarget) {
+export function createPeerConnection(clientId: string, socket: WebSocket, emitter: EventTarget, dataChannels?: any) {
 	const pc = new RTCPeerConnection(configuration)
 
 	pc.onicecandidate = function (e) {
@@ -118,7 +118,7 @@ export function createPeerConnection(clientId: string, socket: WebSocket, emitte
 	}
 
 	pc.ontrack = function (e) {
-		this.dispatchEvent(new MessageEvent('add', {
+		emitter.dispatchEvent(new MessageEvent('add', {
 			data: {
 				id: clientId,
 				stream: e.streams[0]
@@ -127,8 +127,10 @@ export function createPeerConnection(clientId: string, socket: WebSocket, emitte
 	}
 
 	pc.ondatachannel = function (e) {
-		// TODO: add to #dataChannels
-		addDataChannel(clientId, e.channel, emitter)
+		const channel = addDataChannel(clientId, e.channel, emitter)
+		if (dataChannels) {
+			dataChannels[clientId] = channel
+		}
 	}
 
 	return pc

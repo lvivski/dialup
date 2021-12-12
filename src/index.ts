@@ -1,1 +1,2 @@
-export * from './dialup.js'
+import Dialup from './dialup.js'
+export default Dialup
