@@ -1,5 +1,9 @@
 import iceServers from './ice.js'
 
+const configuration = {
+	iceServers
+}
+
 export function addTracks(pc: RTCPeerConnection, stream: MediaStream) {
 	for (const track of stream.getTracks()) {
 		pc.addTrack(track, stream)
@@ -34,10 +38,6 @@ export function stopTracks(streams: MediaStream[], stream: MediaStream) {
 	for (const track of stream.getTracks()) {
 		track.stop()
 	}
-}
-
-const configuration = {
-	iceServers
 }
 
 export async function createOffer(clientId: string, pc: RTCPeerConnection, socket: WebSocket) {
@@ -98,10 +98,10 @@ export function createPeerConnection(clientId: string, socket: WebSocket, emitte
 	pc.oniceconnectionstatechange = function () {
 		switch (pc.iceConnectionState) {
 			case 'failed':
+				pc.restartIce()
+				break
 			case 'closed':
 				pc.close()
-				break
-			case 'disconnected':
 				break
 			case 'completed':
 				pc.onicecandidate = function () { }
