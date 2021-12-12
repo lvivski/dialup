@@ -3,11 +3,11 @@
   "version": "0.4.0",
   "author": "Yehor Lvivski <yehor@lvivski.com>",
   "description": "WebRTC client/server library",
-	"keywords": [
-		"webrtc"
-	],
+  "keywords": [
+    "webrtc"
+  ],
   "type": "module",
-	"main": "index.js",
+  "main": "index.js",
   "module": "index.js",
   "browser": {
     "./index.js": "./lib/index.js"
@@ -15,9 +15,13 @@
   "dependencies": {
     "ws": "*"
   },
-	"scripts": {
-		"build": "tsc --project tsconfig.json",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
     "prepare": "npm run build"
-	},
+  },
+  "engines": {
+    "node": "16.x",
+    "npm": "8.x"
+  },
   "license": "MIT"
 }
