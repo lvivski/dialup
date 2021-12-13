@@ -67,9 +67,13 @@ export default function Dialup(options) {
 
 	function relay(from, message) {
 		const socket = sockets[message.id]
-		socket.send(JSON.stringify({
-			...message,
-			id: from.clientId
-		}))
+		if (socket) {
+			socket.send(JSON.stringify({
+				...message,
+				id: from.clientId
+			}))
+		} else {
+			console.error(`Socket is not defined for ID:${message.id}`)
+		}
 	}
 }

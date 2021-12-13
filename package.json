@@ -1,6 +1,6 @@
 {
   "name": "dialup",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "author": "Yehor Lvivski <yehor@lvivski.com>",
   "description": "WebRTC client/server library",
   "keywords": [
