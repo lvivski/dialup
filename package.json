@@ -1,17 +1,14 @@
 {
   "name": "dialup",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "author": "Yehor Lvivski <yehor@lvivski.com>",
   "description": "WebRTC client/server library",
   "keywords": [
     "webrtc"
   ],
   "type": "module",
-  "main": "index.js",
-  "module": "index.js",
-  "browser": {
-    "./index.js": "./lib/index.js"
-  },
+  "main": "./lib/index.js",
+	"types": "./lib/index.d.ts",
   "dependencies": {
     "ws": "*"
   },
