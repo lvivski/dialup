@@ -1,6 +1,6 @@
 {
   "name": "dialup",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "author": "Yehor Lvivski <yehor@lvivski.com>",
   "description": "WebRTC client/server library",
   "keywords": [
@@ -10,7 +10,7 @@
   "main": "./lib/index.js",
 	"types": "./lib/index.d.ts",
   "dependencies": {
-    "ws": "*"
+    "ws": "^8.3.0"
   },
   "scripts": {
     "build": "tsc --project tsconfig.json",
