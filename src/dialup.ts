@@ -26,16 +26,6 @@ interface DialupEvent extends MessageEvent {
 	}
 }
 
-type Device = {
-	id: string
-	label: string
-}
-
-type Devices = {
-	video: Device[]
-	audio: Device[]
-}
-
 interface DialupEventListener extends EventListenerObject {
 	handleEvent(e: DialupEvent): void;
 }
@@ -44,17 +34,12 @@ interface Dialup extends EventTarget {
 	addEventListener<K extends DialupEventType>(type: K, callback: DialupEventListener | null, options?: AddEventListenerOptions | boolean): void
 }
 
-interface StreamFilter {
-	filter(stream: MediaStream): void
-}
-
 class Dialup extends EventTarget {
-	#socket: WebSocket
 	#clientIds: string[] = []
-	#userStreams: MediaStream[] = []
-	#filters: StreamFilter[] = []
 	#dataChannels: DataChannels = {}
+	#localStreams: MediaStream[] = []
 	#peerConnections: PeerConnections = {}
+	#socket: WebSocket
 
 	constructor(url: string, room = '') {
 		super()
@@ -75,82 +60,16 @@ class Dialup extends EventTarget {
 		}
 	}
 
-	async getUserStream(audio: MediaTrackConstraints, video: MediaTrackConstraints) {
-		const stream = await navigator.mediaDevices.getUserMedia({
-			audio: typeof audio === 'string'
-				? { deviceId: audio }
-				: audio,
-
-			video: typeof video === 'string'
-				? { deviceId: video }
-				: video
-					? { facingMode: 'user' }
-					: false
-		})
-
-		const replace = Boolean(this.#userStreams[0])
-
-		if (replace) {
-			stopTracks(this.#userStreams, this.#userStreams[0])
-		} else {
-			this.#userStreams.unshift(stream)
-		}
-
-		for (const filter of this.#filters) {
-			filter.filter(stream)
-		}
-
-		for (const clientId of this.#clientIds) {
-			if (replace) {
-				replaceTracks(this.#peerConnections[clientId], stream)
-			} else {
-				addTracks(this.#peerConnections[clientId], stream)
-			}
-		}
-
-		return stream
-	}
-
-	async getDisplayStream() {
-		const stream = await navigator.mediaDevices.getDisplayMedia()
-
-		this.#userStreams.push(stream)
-
+	addStream(stream: MediaStream) {
 		for (const clientId of this.#clientIds) {
 			addTracks(this.#peerConnections[clientId], stream)
 		}
 
-		const video = stream.getVideoTracks()[0]
+		const track = stream.getVideoTracks()[0] || stream.getAudioTracks()[0]
 
-		video.onended = () => {
+		track.onended = () => {
 			this.removeStream(stream)
 		}
-
-		return stream
-	}
-
-	async getMediaDevices() {
-		const mediaDevices = await navigator.mediaDevices.enumerateDevices()
-		const devices: Devices = {
-			video: [],
-			audio: []
-		}
-
-		for (const device of mediaDevices) {
-			if (device.kind === 'videoinput') {
-				devices.video.push({
-					id: device.deviceId,
-					label: device.label || `Camera ${devices.video.length + 1}`
-				})
-			} else {
-				devices.audio.push({
-					id: device.deviceId,
-					label: device.label || `Mic ${devices.audio.length + 1}`
-				})
-			}
-		}
-
-		return devices
 	}
 
 	async handleMessageEvent(e: DialupEvent) {
@@ -187,7 +106,7 @@ class Dialup extends EventTarget {
 				await pc.setRemoteDescription(e.data.description)
 
 				if (pc.iceConnectionState === 'new') {
-					for (const stream of this.#userStreams) {
+					for (const stream of this.#localStreams) {
 						addTracks(pc, stream)
 					}
 				}
@@ -199,12 +118,8 @@ class Dialup extends EventTarget {
 		}
 	}
 
-	addFilter(filter: StreamFilter) {
-		this.#filters.push(filter)
-	}
-
 	removeStream(stream: MediaStream) {
-		stopTracks(this.#userStreams, stream)
+		stopTracks(this.#localStreams, stream)
 
 		for (const clientId of this.#clientIds) {
 			removeTracks(this.#peerConnections[clientId], stream)
