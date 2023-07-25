@@ -1,20 +1,30 @@
 {
-  "name": "dialup",
-  "version": "0.4.4",
-  "author": "Yehor Lvivski <yehor@lvivski.com>",
-  "description": "WebRTC client/server library",
-  "keywords": [
-    "webrtc"
-  ],
-  "type": "module",
-  "main": "./lib/index.js",
+	"name": "dialup",
+	"version": "0.4.4",
+	"author": "Yehor Lvivski <yehor@lvivski.com>",
+	"description": "WebRTC client/server library",
+	"keywords": [
+		"webrtc"
+	],
+	"type": "module",
+	"main": "./lib/index.js",
 	"types": "./lib/index.d.ts",
-  "dependencies": {
-    "ws": "^8.3.0"
-  },
-  "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "prepare": "npm run build"
-  },
-  "license": "MIT"
+	"dependencies": {
+		"ws": "^8"
+	},
+	"devDependencies": {
+		"typescript": "^5"
+	},
+	"scripts": {
+		"build": "tsc --project tsconfig.json",
+		"prepare": "npm run build"
+	},
+	"license": "MIT",
+	"prettier": {
+		"singleQuote": true,
+		"semi": false,
+		"tabWidth": 2,
+		"arrowParens": "avoid",
+		"useTabs": true
+	}
 }

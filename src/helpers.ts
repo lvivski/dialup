@@ -1,7 +1,7 @@
 import iceServers from './ice.js'
 
 const configuration = {
-	iceServers
+	iceServers,
 }
 
 export function addTracks(pc: RTCPeerConnection, stream: MediaStream) {
@@ -40,58 +40,87 @@ export function stopTracks(streams: MediaStream[], stream: MediaStream) {
 	}
 }
 
-export async function createOffer(clientId: string, pc: RTCPeerConnection, socket: WebSocket) {
+export async function createOffer(
+	clientId: string,
+	pc: RTCPeerConnection,
+	socket: WebSocket
+) {
 	await pc.setLocalDescription(await pc.createOffer())
 
-	socket.send(JSON.stringify({
-		type: 'offer',
-		id: clientId,
-		description: pc.localDescription
-	}))
+	socket.send(
+		JSON.stringify({
+			type: 'offer',
+			id: clientId,
+			description: pc.localDescription,
+		})
+	)
 }
 
-export async function createAnswer(clientId: string, pc: RTCPeerConnection, socket: WebSocket) {
+export async function createAnswer(
+	clientId: string,
+	pc: RTCPeerConnection,
+	socket: WebSocket
+) {
 	await pc.setLocalDescription(await pc.createAnswer())
 
-	socket.send(JSON.stringify({
-		type: 'answer',
-		id: clientId,
-		description: pc.localDescription
-	}))
+	socket.send(
+		JSON.stringify({
+			type: 'answer',
+			id: clientId,
+			description: pc.localDescription,
+		})
+	)
 }
 
-export function createDataChannel(clientId: string, pc: RTCPeerConnection, emitter: EventTarget) {
+export function createDataChannel(
+	clientId: string,
+	pc: RTCPeerConnection,
+	emitter: EventTarget
+) {
 	const dc = pc.createDataChannel('dataChannel')
 
 	return addDataChannel(clientId, dc, emitter)
 }
 
-export function addDataChannel(clientId: string, dc: RTCDataChannel, emitter: EventTarget) {
-	dc.onopen = function () { }
-	dc.onclose = function () { }
+export function addDataChannel(
+	clientId: string,
+	dc: RTCDataChannel,
+	emitter: EventTarget
+) {
+	dc.onopen = function () {}
+	dc.onclose = function () {}
 
 	dc.onmessage = function ({ data }) {
-		emitter.dispatchEvent(new MessageEvent('data', {
-			data: {
-				id: clientId,
-				data
-			}
-		}))
+		emitter.dispatchEvent(
+			new MessageEvent('data', {
+				data: {
+					id: clientId,
+					data,
+				},
+			})
+		)
 	}
 
 	return dc
 }
 
-export function createPeerConnection(clientId: string, socket: WebSocket, emitter: EventTarget, dataChannels?: any) {
+export function createPeerConnection(
+	clientId: string,
+	socket: WebSocket,
+	emitter: EventTarget,
+	dataChannels?: any
+) {
 	const pc = new RTCPeerConnection(configuration)
 
 	pc.onicecandidate = function (e) {
 		if (e.candidate && e.candidate.candidate) {
-			socket.send(JSON.stringify({
-				type: 'candidate',
-				id: clientId,
-				candidate: e.candidate
-			}))
+			socket.send(
+				JSON.stringify({
+					type: 'candidate',
+					id: clientId,
+					candidate: e.candidate,
+				})
+			)
 		}
 	}
 
@@ -104,7 +133,7 @@ export function createPeerConnection(clientId: string, socket: WebSocket, emitte
 				pc.close()
 				break
 			case 'completed':
-				pc.onicecandidate = function () { }
+				pc.onicecandidate = function () {}
 				break
 		}
 	}
@@ -118,12 +147,14 @@ export function createPeerConnection(clientId: string, socket: WebSocket, emitte
 	}
 
 	pc.ontrack = function (e) {
-		emitter.dispatchEvent(new MessageEvent('add', {
-			data: {
-				id: clientId,
-				stream: e.streams[0]
-			}
-		}))
+		emitter.dispatchEvent(
+			new MessageEvent('add', {
+				data: {
+					id: clientId,
+					stream: e.streams[0],
+				},
+			})
+		)
 	}
 
 	pc.ondatachannel = function (e) {

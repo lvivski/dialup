@@ -1,6 +1,4 @@
-const serversList = [
-	'stun.l.google.com:19302',
-]
+const serversList = ['stun.l.google.com:19302']
 
 type Server = {
 	urls: string[]

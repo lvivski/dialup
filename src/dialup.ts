@@ -5,7 +5,7 @@ import {
 	createPeerConnection,
 	removeTracks,
 	replaceTracks,
-	stopTracks
+	stopTracks,
 } from './helpers.js'
 
 type DataChannels = {
@@ -16,7 +16,15 @@ type PeerConnections = {
 	[key: string]: RTCPeerConnection
 }
 
-type DialupEventType = 'peers' | 'new' | 'candidate' | 'leave' | 'offer' | 'answer' | 'add' | 'data'
+type DialupEventType =
+	| 'peers'
+	| 'new'
+	| 'candidate'
+	| 'leave'
+	| 'offer'
+	| 'answer'
+	| 'add'
+	| 'data'
 
 interface DialupEvent extends MessageEvent {
 	type: DialupEventType
@@ -27,11 +35,15 @@ interface DialupEvent extends MessageEvent {
 }
 
 interface DialupEventListener extends EventListenerObject {
-	handleEvent(e: DialupEvent): void;
+	handleEvent(e: DialupEvent): void
 }
 
 interface Dialup extends EventTarget {
-	addEventListener<K extends DialupEventType>(type: K, callback: DialupEventListener | null, options?: AddEventListenerOptions | boolean): void
+	addEventListener<K extends DialupEventType>(
+		type: K,
+		callback: DialupEventListener | null,
+		options?: AddEventListenerOptions | boolean
+	): void
 }
 
 class Dialup extends EventTarget {
@@ -54,9 +66,11 @@ class Dialup extends EventTarget {
 			const message = JSON.parse(data)
 			const eventType: DialupEventType = message.type
 			delete message.type
-			this.handleMessageEvent(new MessageEvent(eventType, {
-				data: message
-			}) as DialupEvent)
+			this.handleMessageEvent(
+				new MessageEvent(eventType, {
+					data: message,
+				}) as DialupEvent
+			)
 		}
 	}
 
@@ -80,7 +94,11 @@ class Dialup extends EventTarget {
 				for (const clientId of e.data.connections) {
 					this.#clientIds.push(clientId)
 
-					const pc = this.#peerConnections[clientId] = createPeerConnection(clientId, this.#socket, this)
+					const pc = (this.#peerConnections[clientId] = createPeerConnection(
+						clientId,
+						this.#socket,
+						this
+					))
 					this.#dataChannels[clientId] = createDataChannel(clientId, pc, this)
 				}
 
@@ -88,7 +106,12 @@ class Dialup extends EventTarget {
 				break
 			case 'new':
 				this.#clientIds.push(clientId)
-				this.#peerConnections[clientId] = createPeerConnection(clientId, this.#socket, this, this.#dataChannels)
+				this.#peerConnections[clientId] = createPeerConnection(
+					clientId,
+					this.#socket,
+					this,
+					this.#dataChannels
+				)
 
 				this.dispatchEvent(e)
 				break
