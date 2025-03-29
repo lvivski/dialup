@@ -48,6 +48,7 @@ interface Dialup extends EventTarget {
 
 class Dialup extends EventTarget {
 	#clientIds: string[] = []
+	#myId: string = ''
 	#dataChannels: DataChannels = {}
 	#localStreams: MediaStream[] = []
 	#peerConnections: PeerConnections = {}
@@ -91,6 +92,7 @@ class Dialup extends EventTarget {
 		const pc = this.#peerConnections[clientId]
 		switch (e.type) {
 			case 'peers':
+				this.#myId = e.data.you
 				for (const clientId of e.data.connections) {
 					this.#clientIds.push(clientId)
 
